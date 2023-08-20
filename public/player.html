@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>LaunchDarkly DuckHunt - Player</title>
+    <link rel="icon" type="image/x-icon" href="/img/favicon.ico">
+    <link href="/css/core.css" rel="stylesheet" />
+
+    <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
+    <script src="/js/core.js" type="module"></script>
+    <script src="/js/player.js" type="module"></script>
+</head>
+
+<body>
+    <div id="gameCoverContainer" class="container gradientBG">
+        <img id="coverImage" src="/img/cover.png" />
+    </div>
+    <div id="titleContainer" class="container">
+        <div id="title">
+            <img id="titleImage" src="/img/title.png" />
+        </div>
+    </div>
+    <div id="messageContainer" class="container">
+        <div id="messageBackground" class="container"></div>
+        <div id="messageText"></div>
+    </div>
+    <div id="spritesContainer" class="container">
+        <div id="mountains"></div>
+        <div id="scenery" class="sprite"></div>
+    </div>
+    <div id="playerInfoContainer" class="container">
+        <div id="roundAndScoreContainer">
+            <div id="roundContainer">
+                <div id="roundNumber"></div>
+            </div>
+            <div id="playerNameAndScoreArea">
+                <div id="playerNameAndScore">
+                    <div id="playerName"></div>
+                    <div id="playerScore"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="timebarContainer" class="container">
+        <div id="timeContainer">
+            <div id="timeBackground" class="container">
+                <div id="blueRedTimebarContainer" class="container">
+                    <div id="blueTimebar" class="container"></div>
+                    <div id="redTimebar" class="container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,426 @@
+@font-face {
+    font-family: "Press Start 2P";
+    src: url("/font/PressStart2P-Regular.ttf");
+}
+
+@keyframes gradient {
+    0% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    display: block;
+    border-style: none;
+    background-color: rgb(008, 207, 255);
+    touch-action: none;
+    min-height: var(--app-height);
+}
+
+.container {
+    overflow: hidden;
+    position: absolute;
+    pointer-events: none;
+}
+
+.sprite {
+    position: absolute;
+    pointer-events: none;
+    visibility: hidden;
+    z-index: -6;
+    background-repeat: no-repeat;
+}
+
+#gameCoverContainer {
+    width: 100vw;
+    height: var(--app-height);
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    visibility: hidden;
+}
+
+#coverImage {
+    position: relative;
+    max-width: 100%;
+    max-height: 100%;
+    margin: auto;
+    display: block;
+    cursor: pointer;
+}
+
+.gradientBG {
+    background: linear-gradient(-90deg, #a34fde, #ff386b, #ebff38, #3dd6f5);
+    background-size: 400% 400%;
+    animation: gradient 5s ease infinite;
+    height: var(--app-height);
+}
+
+#titleContainer {
+    height: var(--app-height);
+    width: 100vw;
+    z-index: 2;
+    visibility: hidden;
+}
+
+#title {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+#titleImage {
+    position: relative;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+#logoAreaContainer {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    width: 100vw;
+    height: 105px;
+    background-color: #AB2621;
+    bottom: 0px;
+    gap: 4px;
+    padding: 4px;
+    justify-content: space-between;
+    visibility: hidden;
+    border-radius: 4px;
+    border: 4px solid #000000;
+    outline: 2px solid #ffffff;
+}
+
+#logoContainer {
+    display: flex;
+    border-radius: 7px;
+    background-color: black;
+}
+
+#logoImage {
+    height: 80px;
+    margin: auto;
+    display: block;
+}
+
+#dhLogoContainer {
+    display: flex;
+    border-radius: 7px;
+    background-color: black;
+}
+
+#dhLogo {
+    width: 200px;
+    height: 80px;
+    margin: auto;
+}
+
+#titleQRCodeContainer {
+    margin-bottom: 15px;
+    margin-right: 15px;
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    right: 0;
+}
+
+#logoQRCodeContainer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #000000;
+    border-radius: 7px;
+}
+
+#qrCodeMessage {
+    font-family: "Press Start 2P";
+    font-size: 14pt;
+    color: #ffffff;
+    margin-right: 20px;
+}
+
+#titleQRCode img {
+    height: 100px;
+    width: 100px;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+#logoQRCode {
+    width: 100px;
+    height: 90px;
+}
+
+#logoQRCode img {
+    height: 100%;
+    width: 100%;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+#playerInfoContainer {
+    display: flex;
+    bottom: 0px;
+    margin-bottom: 60px;
+    visibility: hidden;
+    width: 100vw;
+    justify-content: space-around;
+    z-index: 1;
+}
+
+#roundAndScoreContainer {
+    width: 357px;
+    display: flex;
+    justify-content: space-between;
+}
+
+#roundContainer {
+    display: flex;
+}
+
+#roundNumber {
+    background-color: #000000;
+    color: #8EDD0A;
+    font-size: 20pt;
+    align-self: flex-end;
+    font-family: "Press Start 2P";
+    margin-left: 5px;
+}
+
+#playerNameAndScore {
+    border: 3px solid #8EDD0A;
+    border-radius: 10px;
+    background-color: #000000;
+    height: 100%;
+    width: 182px;
+    padding: 3px;
+    flex-direction: column;
+    display: inline-flex;
+    font-family: "Press Start 2P";
+    color: #ffffff;
+    margin-left: 5px;
+}
+
+#playerName {
+    height: 20px;
+    font-size: 8pt;
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+}
+
+#playerScore {
+    height: 30px;
+    font-size: 20pt;
+    margin-left: auto;
+    align-items: center;
+    display: flex;
+}
+
+#spritesContainer {
+    width: 100vw;
+    height: 100vh;
+    height: var(--app-height);
+    z-index: 0;
+}
+
+#gameInfoContainer {
+    position: fixed;
+    top: 50%;
+    right: 0;
+    transform: translate(0%, -50%);
+    visibility: hidden;
+    width: 400px;
+}
+
+#gameInfoContainer>div {
+    padding: 18px;
+    margin-right: 15px;
+    border-radius: 10px;
+    border: 4px solid #000000;
+    outline: 2px solid #ffffff;
+    background-color: #AB2621;
+}
+
+#gameInfoContainer>div>div {
+    border-radius: 7px;
+    background-color: #000000;
+    padding: 18px;
+}
+
+#leaderText {
+    font-family: "Press Start 2P";
+    font-size: 10pt;
+    color: #ffffff;
+    text-align: right;
+    padding: 10px;
+    margin-top: 8px;
+    padding-top: 0px;
+}
+
+#leaderText div {
+    padding-bottom: 10px;
+}
+
+#leaderList {
+    height: 160px;
+}
+
+.infoList {
+    border-radius: 7px;
+    height: 300px;
+    border: 10px solid #4BDFDD;
+    background-color: #000000;
+}
+
+.infoTitle {
+    font-family: "Press Start 2P";
+    font-size: 16pt;
+    color: #ffffff;
+    background-color: #000000;
+    display: table;
+    margin: 0 auto;
+    margin-top: -14px;
+    padding-left: 4px;
+    padding-right: 4px;
+}
+
+#infoArea {
+    margin-top: 20px;
+    height: 200px;
+}
+
+#infoText {
+    font-family: "Press Start 2P";
+    font-size: 8pt;
+    color: #ffffff;
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-bottom: 10px;
+    padding-top: 0px;
+    margin-top: 8px;
+    text-align: left;
+}
+
+#infoText div {
+    padding-bottom: 8px;
+}
+
+#mountains {
+    visibility: visible;
+    position: absolute;
+    bottom: 175px;
+    left: 0px;
+    width: 100vw;
+    height: 698px;
+    background-position: left bottom;
+    background-size: contain;
+    background-repeat: repeat-x;
+    background-image: url('/img/mountains.png');
+    z-index: -7;
+}
+
+#scenery {
+    visibility: visible;
+    position: absolute;
+    z-index: -5;
+    bottom: 0px;
+    width: calc(100vw * 8);
+    height: 800px;
+    background-position: left bottom;
+    background-repeat: repeat-x;
+    background-image: url('/img/scenery.png');
+}
+
+#messageContainer {
+    width: 100vw;
+    height: var(--app-height);
+    z-index: 3;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    visibility: hidden;
+}
+
+#messageBackground {
+    width: 315px;
+    height: 63px;
+    z-index: -1;
+    background-image: url('/img/messagesBackground.png');
+    background-position: 0px 0px;
+    background-repeat: no-repeat;
+}
+
+#messageText {
+    width: 315px;
+    height: 63px;
+    z-index: 0;
+    background-image: url('/img/messagesText.png');
+    background-repeat: no-repeat;
+    position: absolute;
+    cursor: pointer;
+}
+
+#timebarContainer {
+    width: 100vw;
+    bottom: 0px;
+    z-index: 1;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    visibility: hidden;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+#timeContainer {
+    width: 357px;
+    height: 36px;
+    position: relative;
+    overflow: hidden;
+}
+
+#timeBackground {
+    width: 357px;
+    height: 36px;
+    background-image: url('/img/timeBackground.png');
+    background-repeat: no-repeat;
+}
+
+#blueRedTimebarContainer {
+    width: 333px;
+    height: 12px;
+    top: 12px;
+    left: 12px;
+}
+
+#blueTimebar {
+    width: 333px;
+    height: 12px;
+    background-repeat: no-repeat;
+    background-image: url('/img/blueTimeBar.png');
+}
+
+#redTimebar {
+    width: 333px;
+    height: 12px;
+    left: 180px;
+    background-repeat: no-repeat;
+    background-image: url('/img/redTimeBar.png');
+}

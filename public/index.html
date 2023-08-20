@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>LaunchDarkly DuckHunt - Kiosk</title>
+    <link rel="icon" type="image/x-icon" href="/img/favicon.ico">
+    <link href="/css/core.css" rel="stylesheet" />
+    <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
+    <script src="/js/core.js" type="module"></script>
+    <script src="/js/index.js" type="module"></script>
+    <script src="/js/qrcode.js"></script>
+</head>
+
+<body>
+    <div id="titleContainer" class="container">
+        <div id="title">
+            <img id="titleImage" src="/img/title.png" />
+            <div id="titleQRCodeContainer">
+                <div id="titleQRCode"></div>
+            </div>
+        </div>
+    </div>
+    <div id="messageContainer" class="container">
+        <div id="messageBackground" class="container"></div>
+        <div id="messageText"></div>
+    </div>
+    <div id="spritesContainer" class="container">
+        <div id="mountains"></div>
+        <div id="scenery" class="sprite"></div>
+    </div>
+    <div id="gameInfoContainer">
+        <div>
+            <div>
+                <div id="leaderList" class="infoList">
+                    <div class="infoTitle">LEADERS</div>
+                    <div id="leaderText"></div>
+                </div>
+                <div id="infoArea" class="infoList">
+                    <div class="infoTitle">UPDATES</div>
+                    <div id="infoText"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="logoAreaContainer" class="container">
+        <div id="logoContainer">
+            <img id="logoImage" src="/img/ld8bit.png" />
+        </div>
+        <div id="dhLogoContainer">
+            <img id="dhLogo" src="/img/dh.png" />
+        </div>
+        <div id="logoQRCodeContainer">
+            <div id="qrCodeMessage">
+                SCAN TO PLAY! &#8594;
+            </div>
+            <div id="logoQRCode"></div>
+        </div>
+    </div>
+</body>
+
+</html>

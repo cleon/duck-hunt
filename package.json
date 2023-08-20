@@ -1,0 +1,17 @@
+{
+  "name": "ld-duck-hunt",
+  "version": "1.0.0",
+  "description": "- Remove two player / keyboard controls",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ably": "^1.2.39",
+    "cors-anywhere": "^0.4.4",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2"
+  }
+}
