@@ -3,6 +3,7 @@ const express = require("express");
 const cors = require("cors-anywhere");
 const Ably = require("ably");
 const app = express();
+const fetch = require("node-fetch");
 
 // app settings
 const port = process.env.PORT || 8080;
