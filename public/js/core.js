@@ -68,10 +68,14 @@ class Sounds {
                 snd.buffer = sound.buffer;
                 snd.connect(sound.vol);
                 if (endedCallback) {
-                    snd.addEventListener("ended", () => { endedCallback(); });
+                    if (snd.onended) {
+                        snd.onended = () => { endedCallback(); };
+                    } else {
+                        snd.addEventListener("ended", () => { endedCallback(); });
+                    }
                 }
-                sound.nodes.push(snd);
                 snd.start();
+                sound.nodes.push(snd);
                 return snd;
             };
 
@@ -675,6 +679,44 @@ class Timebar {
     }
 }
 
+class Features {
+    // feature flags + fallback values
+    static #clientSideID = "60d1cf33e50e740da22ac527";
+    static #flags = {
+        "soundEnabled": true,       // all sounds on/off
+        "ducksToLaunch": 5,         // initial number of ducks per round
+        "flockMultiplier": 1.5,     // number of ducks increased per round
+        "speedMultiplier": 0.2,     // clock speed and duck flight speed multiplier
+        "lastDuckGoesCrazy": true   // make the last duck harder to kill and quack a lot
+    };
+    static #ldclient = null;
+    static {
+        this.#ldclient = LDClient.initialize(this.#clientSideID, { kind: "user", key: "ld-duck-hunt" });
+        for (let key of Object.keys(this.#flags)) {
+            let feature = {};
+            feature.key = key;
+            feature.fallback = this.#flags[key];
+            feature.value = async function () {
+                let value = feature.fallback;
+                try {
+                    await Features.#ldclient.waitUntilReady();
+                    value = await Features.#ldclient.variation(feature.key, feature.fallback);
+                } catch (e) {
+                    console.error("Unable to get flag value", e);
+                } finally {
+                    return value;
+                }
+            };
+            feature.onChange = (callback) => {
+                this.#ldclient.on(`change:${feature.key}`, (current, previous) => {
+                    callback(current, previous);
+                });
+            };
+            this[key] = feature;
+        }
+    }
+}
+
 class Game {
     static {
         window.addEventListener("resize", Game.appHeight);
@@ -732,12 +774,19 @@ class Game {
         //   - feature toggles: sound on/off, recharge timer on/off, duck counts, etc
         this.gameChannel = null;
 
-        // feature flags + fallback values
-        this.soundEnabled = true; // all sounds on/off
-        this.ducksToLaunch = 5; // initial num of ducks per round
-        this.flockMultiplier = 1.5; // number of ducks increased per round
-        this.speedMultiplier = 0.2; // clock speed and duck flight speed multiplier
-        this.lastDuckGoesCrazy = true; // make the last duck harder to kill and quack a lot
+        (async () => {
+            this.soundEnabled = await Features.soundEnabled.value();
+            this.ducksToLaunch = await Features.ducksToLaunch.value();
+            this.flockMultiplier = await Features.flockMultiplier.value();
+            this.speedMultiplier = await Features.speedMultiplier.value();
+            this.lastDuckGoesCrazy = await Features.lastDuckGoesCrazy.value();
+
+            Features.soundEnabled.onChange((current) => { this.soundEnabled = current; });
+            Features.ducksToLaunch.onChange((current) => { this.ducksToLaunch = current; });
+            Features.flockMultiplier.onChange((current) => { this.flockMultiplier = current; });
+            Features.speedMultiplier.onChange((current) => { this.speedMultiplier = current; });
+            Features.lastDuckGoesCrazy.onChange((current) => { this.lastDuckGoesCrazy = current; });
+        })();
     }
 
     #makeTitleScreenDucks() {
