@@ -1,32 +1,32 @@
 "use strict";
 
-import { Game, Duck, Messages, Sight, Sounds, Timebar } from "./core.js";
+import { Game, Messages, Sight, Sounds, Timebar } from "./core.js";
 
 class PlayerGame extends Game {
   constructor() {
     super();
 
     // player game-specific stuff
-    this.gameCoverContainer = document.getElementById("gameCoverContainer");
+    // this.gameCoverContainer = document.getElementById("gameCoverContainer");
     this.playerInfoContainer = document.getElementById("playerInfoContainer");
     this.playerName = document.getElementById("playerName");
     this.playerScore = document.getElementById("playerScore");
     this.roundNumber = document.getElementById("roundNumber");
 
-    //this.shootingEnabled = false;
-    this.toggleShootingEnabled(false);
+    this.shootingEnabled = false;
     this.sight = new Sight();
-    this.sprites.appendChild(this.sight.el);
+    this.spritesContainer.appendChild(this.sight.el);
 
-    this.ducks = new Map();
-    this.landedDuckCount = 0;
-    this.ducksInCurrentRound = 0;
-    this.ducksToFetch = 0;
+    this.sprites = new Map();
+    this.landedSpriteCount = 0;
+    this.spritesInCurrentRound = 0;
+    this.spritesToFetch = 0;
+
     this.score = 0;
     this.round = 0;
 
     this.timerRoundSpeedFactor = 1;
-    this.duckFlightSpeedFactor = 1;
+    this.spriteFlightSpeedFactor = 1;
     this.timeRewardFactor = 1;
 
     this.player = {
@@ -35,20 +35,21 @@ class PlayerGame extends Game {
     };
 
     // player channel used to publish messages:
-    //    - launching ducks
-    //    - hit a duck, send current score 
+    //    - launching sprites
+    //    - hit a sprite, send current score 
     //    - game over
     this.playerChannel = null;
   }
 
   run() {
-    this.messages.toggleTitle(true);
     this.initPlayerInteractions();
-    Timebar.onTimesUp(() => { this.timesUp(); });
+    this.messages.toggleTitle(true);
     this.#generateGamerTag().then(super.run());
   }
 
   main() {
+    this.makeTitleScreenSprites();
+    Timebar.onTimesUp(() => { this.timesUp(); });
     this.gameChannel.presence.enter({ player: this.player }).then(() => {
       this.playerChannel = this.RT.channels.get(`player-${this.RT.auth.clientId}`);
       this.setPlayerName(this.player.nickname);
@@ -60,7 +61,7 @@ class PlayerGame extends Game {
     this.messages.toggleTitle(true);
     this.toggleScrollingScenery(true);
     this.hideClouds();
-    this.toggleTitleDucks(true);
+    this.toggleTitleSprites(true);
     this.dog.showRunning();
 
     Sounds.run.play(() => { // dont do ish until that jam ends. let the music play on play on play on...
@@ -74,8 +75,8 @@ class PlayerGame extends Game {
   }
 
   prepareNewRound() {
-    this.ducksToFetch = 0;
-    this.landedDuckCount = 0;
+    this.spritesToFetch = 0;
+    this.landedSpriteCount = 0;
     this.round++;
     this.messages.show(Messages.GetReady);
     this.setRoundNumber(this.round);
@@ -83,23 +84,23 @@ class PlayerGame extends Game {
     this.toggleShootingEnabled(false);
     this.sight.hide();
     this.dog.showRunning();
-    this.ducks.clear();
+    this.sprites.clear();
   }
 
   prepareNewGame() {
     //reset game state
     this.score = 0;
     this.round = 0;
-    this.landedDuckCount = 0;
+    this.landedSpriteCount = 0;
     this.timerRoundSpeedFactor = 1;
-    this.duckFlightSpeedFactor = 1;
+    this.spriteFlightSpeedFactor = 1;
     this.timeRewardFactor = 1;
 
     Timebar.reset();
 
     //setup the UI
     this.messages.toggleTitle(false);
-    this.toggleTitleDucks(false);
+    this.toggleTitleSprites(false);
     Timebar.toggleVisible(true);
     this.togglePlayerInfo(true);
     this.setPlayerScore(this.score);
@@ -116,9 +117,9 @@ class PlayerGame extends Game {
       this.messages.hide();
       this.toggleScrollingScenery(false);
 
-      this.ducksInCurrentRound = this.ducksToLaunch;
+      this.spritesInCurrentRound = this.spritesToLaunch;
       this.adjustDifficulty();
-      this.launchDucks(this.ducksInCurrentRound, this.duckFlightSpeedFactor);
+      this.launchSprites(this.spritesInCurrentRound, this.spriteFlightSpeedFactor);
 
       Timebar.start(this.timerRoundSpeedFactor);
     }, 2500);
@@ -126,9 +127,9 @@ class PlayerGame extends Game {
 
   adjustDifficulty() {
     if (this.round > 1) {
-      this.ducksInCurrentRound = this.ducksToLaunch + Math.floor(this.flockMultiplier * this.round);
+      this.spritesInCurrentRound = this.spritesToLaunch + Math.floor(this.flockMultiplier * this.round);
       this.timerRoundSpeedFactor = this.timerRoundSpeedFactor + (this.timerRoundSpeedFactor * this.speedMultiplier);
-      this.duckFlightSpeedFactor = this.duckFlightSpeedFactor + (this.duckFlightSpeedFactor * this.speedMultiplier);
+      this.spriteFlightSpeedFactor = this.spriteFlightSpeedFactor + (this.spriteFlightSpeedFactor * this.speedMultiplier);
       this.timeRewardFactor = this.timeRewardFactor + Math.round(this.timeRewardFactor * this.speedMultiplier);
     }
   }
@@ -144,10 +145,11 @@ class PlayerGame extends Game {
 
     Sounds.barkX3.stop();
     Sounds.bgm.stop();
-    Sounds.quack.stop();
-    Sounds.fly.play();
 
-    this.ducks.forEach(duck => duck.flyAway());
+    this.spriteConfig.sounds.hit.stop();
+    this.spriteConfig.sounds.flyAway.play();
+
+    this.sprites.forEach(sprite => sprite.flyAway());
     this.playerChannel.publish("gameOver", {});
 
     setTimeout(() => {
@@ -186,58 +188,58 @@ class PlayerGame extends Game {
     //(enabled) ? this.sprites.addEventListener("click", void (0)) : this.sprites.removeEventListener("click", void (0));
   }
 
-  launchDucks(numberOfDucks, speedFactor) {
-    this.playerChannel.publish("launchDucks", { count: numberOfDucks });
-    for (let i = 0; i < numberOfDucks; i++) {
-      let duck = new Duck();
-      this.sprites.appendChild(duck.el);
-      this.wireUpDuckEvents(duck);
-      this.ducks.set(duck.id, duck);
-      duck.show();
-      duck.animate();
-      duck.flyAround(speedFactor);
+  launchSprites(numberOfSprites, speedFactor) {
+    this.playerChannel.publish("launchSprites", { count: numberOfSprites });
+    for (let i = 0; i < numberOfSprites; i++) {
+      const sprite = this.makeShootableSprite();
+      this.spritesContainer.appendChild(sprite.el);
+      this.wireUpSpriteEvents(sprite);
+      this.sprites.set(sprite.id, sprite);
+      sprite.show();
+      sprite.animate();
+      sprite.flyAround(speedFactor);
     }
   }
 
-  wireUpDuckEvents(duck) {
-    duck.onShot((d) => {
+  wireUpSpriteEvents(sprite) {
+    sprite.onShot(s => {
       if (this.shootingEnabled) {
         if (this.round > 1) {
           Timebar.add(this.timeRewardFactor);
         }
-        this.ducks.delete(d.id);
+        this.sprites.delete(s.id);
         this.score++;
         this.setPlayerScore(this.score);
         this.playerChannel.publish("hit", {});
-        if (this.ducks.size == 0) {
+        if (this.sprites.size == 0) {
           if (!Timebar.timesUp()) {
             Timebar.pause();
-            if (this.lastDuckGoesCrazy) {
-              Sounds.quack.stop();
+            if (this.lastSpriteGoesCrazy) {
+              this.spriteConfig.sounds.hit.stop();
             }
           }
-        } else if (this.ducks.size == 1 && this.lastDuckGoesCrazy) {
-          const lastDuck = this.ducks.values().next().value;
-          lastDuck.movementSpeed *= 1.5;
-          Sounds.quack.loop();
+        } else if (this.sprites.size == 1 && this.lastSpriteGoesCrazy) {
+          const lastSprite = this.sprites.values().next().value;
+          lastSprite.movementSpeed *= 1.5;
+          this.spriteConfig.sounds.hit.loop();
         }
       }
     });
 
-    duck.onLanded((d) => {
-      d.remove();
-      this.ducks.delete(d.id);
-      this.ducksToFetch++;
-      this.landedDuckCount++;
+    sprite.onLanded(s => {
+      s.remove();
+      this.sprites.delete(s.id);
+      this.spritesToFetch++;
+      this.landedSpriteCount++;
       if (!this.dog.isFetching && !Timebar.timesUp()) {
         setTimeout(() => {
-          const count = this.ducksToFetch;
+          const count = this.spritesToFetch;
           if (!this.dog.isFetching && !Timebar.timesUp()) {
-            this.dog.fetchDucksAtX(count, d.x, () => {
-              this.ducksToFetch = 0;
-              if (this.landedDuckCount == this.ducksInCurrentRound) {
+            this.dog.fetchSpritesAtX(count, s.x, () => {
+              this.spritesToFetch = 0;
+              if (this.landedSpriteCount == this.spritesInCurrentRound) {
                 setTimeout(() => {
-                  this.ducksToFetch = 0;
+                  this.spritesToFetch = 0;
                   this.prepareNewRound();
                   this.startRound();
                 }, 1200);
@@ -270,19 +272,21 @@ class PlayerGame extends Game {
     };
   }
 
-  showGameCover(callback) {
-    const el = this.gameCoverContainer;
-    el.style.pointerEvents = "auto";
-    el.style.visibility = "visible";
-    el.onclick = () => {
-      el.style.pointerEvents = "none";
-      el.style.visibility = "hidden";
-      callback();
-    };
-  }
+  // showGameCover(callback) {
+  //   const el = this.gameCoverContainer;
+  //   el.style.cursor = "pointer";
+  //   el.style.pointerEvents = "auto";
+  //   el.style.visibility = "visible";
+  //   el.onclick = () => {
+  //     el.style.cursor = "none";
+  //     el.style.pointerEvents = "none";
+  //     el.style.visibility = "hidden";
+  //     callback();
+  //   };
+  // }
 
   async #generateGamerTag() {
-    const localStorageKey = "ld-duckhunt-tag";
+    const localStorageKey = "launch-duckly-tag";
     let nickname = localStorage.getItem(localStorageKey);
     if (nickname) {
       this.player.nickname = nickname;

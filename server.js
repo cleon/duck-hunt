@@ -11,13 +11,13 @@ const corsPort = process.env.CORS_PORT || 9090;
 const corsHost = process.env.CORS_HOST || "127.0.0.1";
 const AblyKey = process.env.ABLY_KEY;
 const RT = new Ably.Realtime({ key: AblyKey });
-const gameChannelName = "ld-duck-hunt";
+const gameChannelName = "launch-duckly";
 
 const Messages = {
   Enter: "enter",
   Leave: "leave",
   StartGame: "startGame",
-  LaunchDucks: "launchDucks",
+  LaunchSprites: "launchSprites",
   Hit: "hit",
   GameOver: "gameOver",
   Leaderboard: "leaderboard"
@@ -102,8 +102,8 @@ function subscribeToPlayerMessages(playerId) {
   playerChannels.set(playerId, RT.channels.get("player-" + playerId));
   const channel = playerChannels.get(playerId);
 
-  channel.subscribe(Messages.LaunchDucks, (msg) => {
-    gameChannel.publish(Messages.LaunchDucks, { player: players.get(msg.clientId), count: msg.data.count });
+  channel.subscribe(Messages.LaunchSprites, (msg) => {
+    gameChannel.publish(Messages.LaunchSprites, { player: players.get(msg.clientId), count: msg.data.count });
   });
 
   channel.subscribe(Messages.Hit, (msg) => {

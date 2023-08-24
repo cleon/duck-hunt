@@ -1,6 +1,6 @@
 "use strict";
 
-import { Game, Duck, Sounds } from "./core.js";
+import { Game, Sounds } from "./core.js";
 
 class KioskGame extends Game {
   constructor() {
@@ -16,7 +16,7 @@ class KioskGame extends Game {
   main() {
     this.messages.toggleTitle(true);
     this.toggleLogoArea(false);
-    this.toggleTitleDucks(true);
+    this.toggleTitleSprites(true);
     this.toggleGameInfo(false);
     this.toggleScrollingScenery(true);
     this.animateClouds();
@@ -29,7 +29,7 @@ class KioskGame extends Game {
         this.showKioskUI();
       }
       const player = msg.data.player;
-      player.ducks = [];
+      player.sprites = [];
       this.players.set(player.nickname, player);
       this.logPlayerJoined(player);
     });
@@ -38,23 +38,23 @@ class KioskGame extends Game {
       const key = msg.data.player.nickname;
       if (this.players.size > 0 && this.players.has(key)) {
         const player = this.players.get(key);
-        this.playerDucksFlyAway(player.ducks);
+        this.playerSpritesFlyAway(player.sprites);
         this.logPlayerLeft(player);
         this.players.delete(player.nickname);
       }
     });
 
-    this.gameChannel.subscribe("launchDucks", (msg) => {
+    this.gameChannel.subscribe("launchSprites", (msg) => {
       this.messages.hide();
       let player = this.players.get(msg.data.player.nickname);
-      this.launchDucks(msg.data.count, player);
-      console.log(`launching ${msg.data.count} ducks for ${player.nickname}`);
+      this.launchSprites(msg.data.count, player);
+      console.log(`launching ${msg.data.count} sprites for ${player.nickname}`);
     });
 
     this.gameChannel.subscribe("hit", (msg) => {
       const player = this.players.get(msg.data.player.nickname);
       if (player) {
-        this.hitDuck(player);
+        this.hitSprite(player);
       }
     });
 
@@ -63,8 +63,8 @@ class KioskGame extends Game {
       const player = this.players.get(key);
       if (player) {
         Sounds.fly.play();
-        this.playerDucksFlyAway(player.ducks);
-        player.ducks = [];
+        this.playerSpritesFlyAway(player.sprites);
+        player.sprites = [];
         this.logPlayerGameOver(player);
       }
     });
@@ -77,7 +77,7 @@ class KioskGame extends Game {
   showKioskUI() {
     this.messages.toggleTitle(false);
     this.toggleLogoArea(true);
-    this.toggleTitleDucks(false);
+    this.toggleTitleSprites(false);
     this.toggleGameInfo(true);
     this.toggleScrollingScenery(false);
     this.dog.stopAnimation();
@@ -139,36 +139,39 @@ class KioskGame extends Game {
     this.logoAreaContainer.style.visibility = (visible) ? "visible" : "hidden";
   }
 
-  hitDuck(player) {
-    if (player.ducks.length > 0) {
-      player.ducks[0].shoot();
-      player.ducks.shift();
+  hitSprite(player) {
+    if (player.sprites.length > 0) {
+      player.sprites[0].shoot();
+      player.sprites.shift();
     } else {
-      console.log('no ducks, shouldnt be here');
+      console.error('no sprites, shouldnt be here');
     }
   }
 
-  launchDucks(numberOfDucks, player) {
-    for (let i = 0; i < numberOfDucks; i++) {
-      let duck = new Duck();
-      this.sprites.appendChild(duck.el);
-      duck.showInfoTag(player.nickname, player.color.bg, player.color.text);
-      duck.show();
-      duck.animate();
-      duck.flyAround();
-      duck.onLanded(d => { d.remove(); });
-      player.ducks.push(duck);
+  launchSprites(numberOfSprites, player) {
+    for (let i = 0; i < numberOfSprites; i++) {
+      let sprite = this.makeShootableSprite();
+      this.spritesContainer.appendChild(sprite.el);
+      sprite.showInfoTag(player.nickname, player.color.bg, player.color.text);
+      sprite.show();
+      sprite.animate();
+      sprite.flyAround();
+      sprite.onLanded(d => { d.remove(); });
+      player.sprites.push(sprite);
     }
   }
 
-  playerDucksFlyAway(ducks) {
-    ducks.forEach(duck => {
-      duck.onFlyAway(d => d.remove());
-      duck.flyAway();
+  playerSpritesFlyAway(sprites) {
+    sprites.forEach(sprite => {
+      sprite.onFlyAway(s => s.remove());
+      sprite.flyAway();
     });
   }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  new KioskGame().run();
+  const game = new KioskGame();
+  game.showGameCover(() => {
+    game.run();
+  });
 });

@@ -50,11 +50,9 @@ class Sounds {
     static #files = ['barkX3', 'bgm', 'falling', 'fly', 'ground', 'quack', 'run', 'run2', 'shoot'];
     static #context = null;
     static {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        this.#context = new AudioContext();
-        this.#unlockAudioContext(this.#context);
+        this.#context = new (window.AudioContext || window.webkitAudioContext)();
+        this.#unlockAudioContext();
         let ctx = this.#context;
-
         for (let file of this.#files) {
             let sound = {};
             sound.buffer = null;
@@ -74,6 +72,7 @@ class Sounds {
                         snd.addEventListener("ended", () => { endedCallback(); });
                     }
                 }
+                ctx.resume();
                 snd.start();
                 sound.nodes.push(snd);
                 return snd;
@@ -105,21 +104,19 @@ class Sounds {
     static async load() {
         await Promise.all(this.#files.map(async (file) => {
             const bytes = await fetch(`/snd/${file}.mp3`).then(res => res.arrayBuffer());
-            this[file].buffer = await this.#context.decodeAudioData(bytes);
+            this[file].buffer = await Sounds.#context.decodeAudioData(bytes);
         }));
     }
 
     static muteAll(muted) {
-        for (const file of this.#files) {
-            this[file].mute(muted);
-        }
+        this.#files.forEach(file => this[file].mute(muted));
     }
 
-    static #unlockAudioContext(ctx) {
-        if (ctx.state !== 'suspended') return;
+    static #unlockAudioContext() {
+        if (Sounds.#context.state !== 'suspended') { return; }
         const events = ['touchstart', 'touchend', 'mousedown', 'keydown', 'click'];
         events.forEach(e => document.body.addEventListener(e, unlock, false));
-        function unlock() { ctx.resume().then(clean) }
+        function unlock() { Sounds.#context.resume().then(clean); }
         function clean() { events.forEach(e => document.body.removeEventListener(e, unlock)); }
     }
 }
@@ -213,28 +210,11 @@ class Cloud extends Sprite {
     }
 }
 
-class Duck extends Sprite {
-    // each number is the starting y coord of a row of sprites in img/ducks.png (flying direction)
-    static animationSequence = {
-        FlyNorth: 0,
-        FlyNorthEast: 102,
-        FlyEastMouthOpen: 204,
-        FlySouthEast: 306,
-        FlySouth: 408,
-        FlySouthWest: 510,
-        FlyWest: 612,
-        FlyNorthWest: 714,
-        Hit: 816,
-        Falling: 918,
-        FlyEastMouthClosed: 1020,
-        FlyAway: 1122
-    };
-
-    constructor() {
-        const x = Duck.#rand(1000);
-        const distanceUpFromBottom = 250; // how high (pixels) off the bottom of the screen to place the duck
-        const y = window.innerHeight - distanceUpFromBottom;
-        super(102, 102, x, y, "/img/duck.png");
+class ShootableSprite extends Sprite {
+    constructor(imgUrl, sounds) {
+        const x = ShootableSprite.#rand(1000);
+        const y = window.innerHeight - 250;
+        super(102, 102, x, y, imgUrl);
 
         this.el.style.pointerEvents = "auto";
         this.el.onclick = () => {
@@ -261,17 +241,33 @@ class Duck extends Sprite {
 
         this.el.appendChild(this.infoTag);
 
-        // these are x coords of the starting block of each color of sprites in ducks.png
+        // these are x coords of the starting block of each color of sprites in the sprite sheet
         this.colors = [
-            0,    // start black ducks
-            -306, // start red ducks
-            -612  // start blue ducks
+            0,    // start x coord of black sprite
+            -306, // start x coord of red sprite
+            -612  // start x coord of blue sprite
         ];
 
-        // each number is the starting y coord of a row of sprites in ducks.png (flying direction)
-        this.currentAnimationSequence = Duck.animationSequence.FlyEastMouthClosed;
+        // each number is the starting y coord of a row of sprites in the sprite sheet (flying direction)
+        this.animationSequence = {
+            FlyNorth: 0,
+            FlyNorthEast: 102,
+            FlyEastPose1: 204,
+            FlySouthEast: 306,
+            FlySouth: 408,
+            FlySouthWest: 510,
+            FlyWest: 612,
+            FlyNorthWest: 714,
+            Hit: 816,
+            Falling: 918,
+            FlyEastPose2: 1020,
+            FlyAway: 1122
+        };
 
-        // the order of which frame/x-position of ducks.png to show. it goes from frame 0 to 1 to 2 then back to 1
+        // each number is the starting y coord of a row of sprites in sprite sheet (flying direction)
+        this.currentAnimationSequence = this.animationSequence.FlyEastPose2;
+
+        // the order of which frame/x-position of sprite sheet to show. it goes from frame 0 to 1 to 2 then back to 1
         this.animationFrames = [0, 1, 2, 1];
         this.currentAnimationFrame = 0;
         this.animationTimeoutDelay = 90;
@@ -285,7 +281,15 @@ class Duck extends Sprite {
         this.invincible = false;
 
         // init to a random color
-        this.color = this.colors[Duck.#rand(2)];
+        this.color = this.colors[ShootableSprite.#rand(2)];
+
+        // sounds
+        this.sounds = {
+            hit: sounds.hit,
+            falling: sounds.falling,
+            flyAway: sounds.flyAway,
+            landed: sounds.landed
+        };
     }
 
     animateSprite() {
@@ -302,20 +306,20 @@ class Duck extends Sprite {
             if (this.flyAroundCounter > 150) {
                 this.sensitivityX = this.#positiveNegativeZeroHalf();
                 this.sensitivityY = this.#positiveNegativeZeroHalf();
-                this.flyAroundCounter = Duck.#rand(140);
+                this.flyAroundCounter = ShootableSprite.#rand(140);
                 if (this.sensitivityX == 1 || this.sensitivityX == 0.5) {
                     switch (this.sensitivityY) {
                         case 0:
                         case 0.5:
                         case -0.5:
-                            this.currentAnimationSequence = Duck.animationSequence.FlyEastMouthOpen;
+                            this.currentAnimationSequence = this.animationSequence.FlyEastPose1;
                             break;
                         case -1:
                         case -0.5:
-                            this.currentAnimationSequence = Duck.animationSequence.FlyNorthEast;
+                            this.currentAnimationSequence = this.animationSequence.FlyNorthEast;
                             break;
                         case 1:
-                            this.currentAnimationSequence = Duck.animationSequence.FlySouthEast;
+                            this.currentAnimationSequence = this.animationSequence.FlySouthEast;
                             break;
                     }
                 }
@@ -324,14 +328,14 @@ class Duck extends Sprite {
                         case 0:
                         case 0.5:
                         case -0.5:
-                            this.currentAnimationSequence = Duck.animationSequence.FlyWest;
+                            this.currentAnimationSequence = this.animationSequence.FlyWest;
                             break;
                         case -1:
                         case -0.5:
-                            this.currentAnimationSequence = Duck.animationSequence.FlyNorthWest;
+                            this.currentAnimationSequence = this.animationSequence.FlyNorthWest;
                             break;
                         case 1:
-                            this.currentAnimationSequence = Duck.animationSequence.FlySouthWest;
+                            this.currentAnimationSequence = this.animationSequence.FlySouthWest;
                             break;
                     }
                 }
@@ -340,14 +344,14 @@ class Duck extends Sprite {
                         case 0:
                         case 0.5:
                         case -0.5:
-                            this.currentAnimationSequence = Duck.animationSequence.FlyEastMouthClosed;
+                            this.currentAnimationSequence = this.animationSequence.FlyEastPose2;
                             break;
                         case -1:
                         case -0.5:
-                            this.currentAnimationSequence = Duck.animationSequence.FlyNorth;
+                            this.currentAnimationSequence = this.animationSequence.FlyNorth;
                             break;
                         case 1:
-                            this.currentAnimationSequence = Duck.animationSequence.FlySouth;
+                            this.currentAnimationSequence = this.animationSequence.FlySouth;
                             break;
                     }
                 }
@@ -363,47 +367,47 @@ class Duck extends Sprite {
     fallToTheGround() {
         const threshold = window.innerHeight - 200;//135
         this.animationFrames = [1, 2];
-        this.currentAnimationSequence = Duck.animationSequence.Falling;
+        this.currentAnimationSequence = this.animationSequence.Falling;
         this.currentAnimationFrame = 0;
         this.sensitivityY = 1;
         this.sensitivityX = 0;
         this.animate();
-        Sounds.falling.play();
-        let duck = this;
+        this.sounds.falling.play();
+        let sprite = this;
 
-        (function makeDuckFall() {
+        (function makeSpriteFall() {
             setTimeout(() => {
-                if (duck.y > threshold) {
-                    Sounds.falling.stop();
-                    duck.#landed();
+                if (sprite.y > threshold) {
+                    sprite.sounds.falling.stop();
+                    sprite.#landed();
                 } else {
-                    duck.#move(2); // move twice as fast when falling
-                    makeDuckFall();
+                    sprite.#move(2); // move twice as fast when falling
+                    makeSpriteFall();
                 }
-            }, 40); //<- changes how quickly the bird falls //16, frenchie is 100
+            }, 40); //<- changes how quickly the bird falls
         })();
     }
 
     flyAway() {
-        let duck = this;
-        duck.stopFlying();
-        duck.stopAnimation();
-        duck.sensitivityX = 0;
-        duck.sensitivityY = 0;
-        duck.el.style.pointerEvents = "none";
+        let sprite = this;
+        sprite.stopFlying();
+        sprite.stopAnimation();
+        sprite.sensitivityX = 0;
+        sprite.sensitivityY = 0;
+        sprite.el.style.pointerEvents = "none";
 
         let frame = 0;
-        (function makeDuckFlyAway() {
+        (function makeSpriteFlyAway() {
             if (frame < 7) {
-                const y = Duck.animationSequence.FlyAway;
+                const y = sprite.animationSequence.FlyAway;
                 setTimeout(() => {
-                    const x = frame * -duck.width;
-                    duck.placeBackgroundImage(x, y);
+                    const x = frame * -sprite.width;
+                    sprite.placeBackgroundImage(x, y);
                     frame++;
-                    makeDuckFlyAway();
+                    makeSpriteFlyAway();
                 }, 200);
             } else {
-                duck.#flewAway();
+                sprite.#flewAway();
             }
         })();
     }
@@ -424,7 +428,7 @@ class Duck extends Sprite {
         this.y += this.sensitivityY * (this.movementSpeed * speedMultiplier);
 
         if ((this.y - 30) + this.height < 0) { this.y = -140 + window.innerHeight - this.height; }
-        if ((this.y + 140) + this.height > window.innerHeight && this.currentAnimationSequence != Duck.animationSequence.Falling) { this.y = -this.height + 30; }
+        if ((this.y + 140) + this.height > window.innerHeight && this.currentAnimationSequence != this.animationSequence.Falling) { this.y = -this.height + 30; }
 
         if (this.x < -50) { this.x = window.innerWidth - 50; }
         if (this.x + 50 > window.innerWidth) { this.x = -50; }
@@ -436,14 +440,14 @@ class Duck extends Sprite {
         if (!this.invincible) {
             this.invincible = true;
 
-            this.#raiseEvent("shot", { duck: this });
+            this.#raiseEvent("shot", { sprite: this });
             this.el.style.pointerEvents = "none";
 
             this.stopFlying();
             this.currentAnimationFrame = 0;
-            this.currentAnimationSequence = Duck.animationSequence.Hit;
+            this.currentAnimationSequence = this.animationSequence.Hit;
 
-            Sounds.quack.play();
+            this.sounds.hit.play();
 
             setTimeout(() => {
                 this.stopAnimation();
@@ -458,14 +462,14 @@ class Duck extends Sprite {
 
     #flewAway() {
         this.hide();
-        this.#raiseEvent("flyAway", { duck: this });
+        this.#raiseEvent("flyAway", { sprite: this });
     }
 
     #landed() {
-        Sounds.ground.play();
+        this.sounds.landed.play();
         this.hide();
         this.stopAnimation();
-        this.#raiseEvent("landed", { duck: this });
+        this.#raiseEvent("landed", { sprite: this });
     }
 
     #raiseEvent(name, detail) {
@@ -490,9 +494,9 @@ class Duck extends Sprite {
 
     #positiveNegativeZeroHalf() {
         // return : 1 / -1 / 0 / 0.5 / -0.5
-        let r = Duck.#rand(1) ? -1 : 1;
-        if (Duck.#rand(10) < 2) r = 0;
-        if (Duck.#rand(10) < 4) r *= .5;
+        let r = ShootableSprite.#rand(1) ? -1 : 1;
+        if (ShootableSprite.#rand(10) < 2) r = 0;
+        if (ShootableSprite.#rand(10) < 4) r *= .5;
         return r;
     }
 }
@@ -569,8 +573,8 @@ class Dog extends Sprite {
         this.stopAnimation();
     }
 
-    fetchDucksAtX(duckCount, x, callback) {
-        if (duckCount < 1) {
+    fetchSpritesAtX(spriteCount, x, callback) {
+        if (spriteCount < 1) {
             if (callback) { callback(); }
             return;
         }
@@ -580,7 +584,7 @@ class Dog extends Sprite {
         this.hide();
 
         let y = this.animationSequence.Fetching;
-        if (duckCount < 2) {
+        if (spriteCount < 2) {
             this.setHeightWidth(this.height, 145);
             this.placeBackgroundImage(0, y);
         } else {
@@ -600,7 +604,7 @@ class Dog extends Sprite {
         (function animateFetch() {
             setTimeout(() => {
                 increment = (frameCount++ < 30) ? 5 : -5;
-                if (frameCount == 30) { if (duckCount > 1) { Sounds.barkX3.play(); } }
+                if (frameCount == 30) { if (spriteCount > 1) { Sounds.barkX3.play(); } }
                 if (frameCount > 30 && frameCount < 90) { increment = 0; }
                 if (frameCount < 120) {
                     y -= increment;
@@ -680,32 +684,27 @@ class Timebar {
 }
 
 class Features {
-    // feature flags + fallback values
     static #clientSideID = "60d1cf33e50e740da22ac527";
-    static #flags = {
-        "soundEnabled": true,       // all sounds on/off
-        "ducksToLaunch": 5,         // initial number of ducks per round
-        "flockMultiplier": 1.5,     // number of ducks increased per round
-        "speedMultiplier": 0.2,     // clock speed and duck flight speed multiplier
-        "lastDuckGoesCrazy": true   // make the last duck harder to kill and quack a lot
+    static #flags = {                 // feature flags + fallback values
+        "gameTheme": "ducks",         // the theme of the game
+        "soundEnabled": true,         // all sounds on/off
+        "spritesToLaunch": 5,         // initial number of sprites per round
+        "flockMultiplier": 1.5,       // number of sprites increased per round
+        "speedMultiplier": 0.2,       // clock speed and sprite flight speed multiplier
+        "lastSpriteGoesCrazy": true   // make the last sprte harder to kill and noisier
     };
     static #ldclient = null;
     static {
-        this.#ldclient = LDClient.initialize(this.#clientSideID, { kind: "user", key: "ld-duck-hunt" });
+        this.#ldclient = LDClient.initialize(this.#clientSideID, { kind: "user", key: "launch-duckly-app" });
         for (let key of Object.keys(this.#flags)) {
             let feature = {};
             feature.key = key;
             feature.fallback = this.#flags[key];
-            feature.value = async function () {
-                let value = feature.fallback;
-                try {
-                    await Features.#ldclient.waitUntilReady();
-                    value = await Features.#ldclient.variation(feature.key, feature.fallback);
-                } catch (e) {
-                    console.error("Unable to get flag value", e);
-                } finally {
-                    return value;
-                }
+            feature.value = async () => {
+                let val = feature.fallback;
+                try { val = this.#ldclient.variation(feature.key, feature.fallback); }
+                catch (e) { console.error("Unable to get flag value", e); }
+                finally { return val; }
             };
             feature.onChange = (callback) => {
                 this.#ldclient.on(`change:${feature.key}`, (current, previous) => {
@@ -724,20 +723,23 @@ class Game {
     }
 
     constructor() {
+        // game cover
+        this.gameCoverContainer = document.getElementById("gameCoverContainer");
+
         //sprites
-        this.sprites = document.getElementById("spritesContainer");
+        this.spritesContainer = document.getElementById("spritesContainer");
+        this.spriteConfig = { imgUrl: null, sounds: { hit: null } };
 
         //clouds
         this.clouds = [new Cloud(window.innerWidth - 400, 50, 0.25), new Cloud(window.innerWidth - 250, 150, 0.1)];
-        this.clouds.forEach(cloud => this.sprites.appendChild(cloud.el));
+        this.clouds.forEach(cloud => this.spritesContainer.appendChild(cloud.el));
 
         //dog
         this.dog = new Dog();
-        this.sprites.appendChild(this.dog.el);
+        this.spritesContainer.appendChild(this.dog.el);
 
-        //title ducks
-        this.titleScreenDucks = [];
-        this.#makeTitleScreenDucks();
+        //title screen sprites
+        this.titleScreenSprites = [];
 
         //scenery
         this.scenery = document.getElementById("scenery");
@@ -771,26 +773,50 @@ class Game {
 
         // game channel messages:
         //   - players entering/leaving
-        //   - feature toggles: sound on/off, recharge timer on/off, duck counts, etc
+        //   - feature toggles: sound on/off, recharge timer on/off, sprite counts, etc
         this.gameChannel = null;
-
-        (async () => {
-            this.soundEnabled = await Features.soundEnabled.value();
-            this.ducksToLaunch = await Features.ducksToLaunch.value();
-            this.flockMultiplier = await Features.flockMultiplier.value();
-            this.speedMultiplier = await Features.speedMultiplier.value();
-            this.lastDuckGoesCrazy = await Features.lastDuckGoesCrazy.value();
-
-            Features.soundEnabled.onChange((current) => { this.soundEnabled = current; });
-            Features.ducksToLaunch.onChange((current) => { this.ducksToLaunch = current; });
-            Features.flockMultiplier.onChange((current) => { this.flockMultiplier = current; });
-            Features.speedMultiplier.onChange((current) => { this.speedMultiplier = current; });
-            Features.lastDuckGoesCrazy.onChange((current) => { this.lastDuckGoesCrazy = current; });
-        })();
     }
 
-    #makeTitleScreenDucks() {
-        const titleDucksXYPositions = [
+    makeShootableSprite() {
+        return new ShootableSprite(this.spriteConfig.imgUrl, this.spriteConfig.sounds);
+    }
+
+    #gameThemeChanged(newTheme) {
+        this.gameTheme = newTheme;
+        switch (newTheme) {
+            case "ducks":
+                this.spriteConfig.imgUrl = "/img/duck.png";
+                this.spriteConfig.sounds.hit = Sounds.quack;
+                this.spriteConfig.sounds.falling = Sounds.falling;
+                this.spriteConfig.sounds.flyAway = Sounds.fly;
+                this.spriteConfig.sounds.landed = Sounds.ground;
+                break;
+        }
+        this.onGameThemeChanged();
+    }
+
+    #soundEnabledChanged(enabled) {
+        Sounds.muteAll(!enabled);
+    }
+
+    onGameThemeChanged() {
+    }
+
+    showGameCover(callback) {
+        const el = this.gameCoverContainer;
+        el.style.cursor = "pointer";
+        el.style.pointerEvents = "auto";
+        el.style.visibility = "visible";
+        el.onclick = () => {
+          el.style.cursor = "none";
+          el.style.pointerEvents = "none";
+          el.style.visibility = "hidden";
+          callback();
+        };
+      }
+
+    makeTitleScreenSprites() {
+        const titleSpritesXYPositions = [
             [150, window.innerHeight - 350],
             [window.innerWidth - 300, 50],
             [window.innerWidth - 200, 150],
@@ -798,27 +824,26 @@ class Game {
         ];
 
         for (let i = 0; i < 3; i++) {
-            let duck = new Duck();
-            duck.invincible = true;
-            duck.move(titleDucksXYPositions[i][0], titleDucksXYPositions[i][1]);
+            let sprite = this.makeShootableSprite();
+            sprite.invincible = true;
+            sprite.move(titleSpritesXYPositions[i][0], titleSpritesXYPositions[i][1]);
 
-            if (i == 0) { // make the duck being chased flap faster than the others
-                duck.animationTimeoutDelay = 40;
-                duck.animationSequence = Duck.animationSequence.FlyEastMouthOpen;
+            if (i == 0) { // make the sprite being chased move faster than the others
+                sprite.animationTimeoutDelay = 40;
             }
-            this.titleScreenDucks.push(duck);
-            this.sprites.appendChild(duck.el);
+            this.titleScreenSprites.push(sprite);
+            this.spritesContainer.appendChild(sprite.el);
         }
     }
 
-    toggleTitleDucks(visible) {
-        for (let duck of this.titleScreenDucks) {
+    toggleTitleSprites(visible) {
+        for (let sprite of this.titleScreenSprites) {
             if (visible) {
-                duck.animate();
-                duck.show();
+                sprite.animate();
+                sprite.show();
             } else {
-                duck.stopAnimation();
-                duck.hide();
+                sprite.stopAnimation();
+                sprite.hide();
             }
         }
     }
@@ -858,10 +883,29 @@ class Game {
         }
     }
 
+    async loadFeatureFlags() {
+        this.gameTheme = await Features.gameTheme.value();
+        this.soundEnabled = await Features.soundEnabled.value();
+        this.spritesToLaunch = await Features.spritesToLaunch.value();
+        this.flockMultiplier = await Features.flockMultiplier.value();
+        this.speedMultiplier = await Features.speedMultiplier.value();
+        this.lastSpriteGoesCrazy = await Features.lastSpriteGoesCrazy.value();
+
+        this.#gameThemeChanged(this.gameTheme);
+        this.#soundEnabledChanged(this.soundEnabled);
+
+        Features.gameTheme.onChange(current => this.#gameThemeChanged(current));
+        Features.soundEnabled.onChange(current => this.#soundEnabledChanged(current));
+        Features.spritesToLaunch.onChange(current => this.spritesToLaunch = current);
+        Features.flockMultiplier.onChange(current => this.flockMultiplier = current);
+        Features.speedMultiplier.onChange(current => this.speedMultiplier = current);
+        Features.lastSpriteGoesCrazy.onChange(current => this.lastSpriteGoesCrazy = current);
+    }
+
     async initRT() {
         this.RT = new Ably.Realtime.Promise({ authUrl: "/auth", transportParams: { remainPresentFor: 1000 } });
         await this.RT.connection.once("connected");
-        this.gameChannel = this.RT.channels.get("ld-duck-hunt");
+        this.gameChannel = this.RT.channels.get("launch-duckly");
     }
 
     async loadImages() {
@@ -879,6 +923,7 @@ class Game {
 
     async loadAssets() {
         try {
+            await this.loadFeatureFlags();
             await this.initRT();
             await this.loadImages();
             await Sounds.load();
@@ -902,4 +947,4 @@ class Game {
     }
 }
 
-export { Game, Messages, Sounds, Duck, Sight, Timebar };
+export { Game, Messages, Sounds, Sight, Timebar };
