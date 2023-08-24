@@ -604,7 +604,7 @@ class Dog extends Sprite {
         (function animateFetch() {
             setTimeout(() => {
                 increment = (frameCount++ < 30) ? 5 : -5;
-                if (frameCount == 30) { if (spriteCount > 1) { Sounds.barkX3.play(); } }
+                if (frameCount == 30) { if (spriteCount > 1) { dog.bark(); } }
                 if (frameCount > 30 && frameCount < 90) { increment = 0; }
                 if (frameCount < 120) {
                     y -= increment;
@@ -617,6 +617,14 @@ class Dog extends Sprite {
                 }
             }, 14); //<- changes how quickly the dog springs up and back down during fetch
         })();
+    }
+
+    bark() {
+        Sounds.barkX3.play();
+    }
+
+    stopBarking() {
+        Sounds.barkX3.stop();
     }
 }
 
@@ -684,7 +692,7 @@ class Timebar {
 }
 
 class Features {
-    static #clientSideID = "60d1cf33e50e740da22ac527";
+    static #clientSideID = "64e7df086c126013090fd6c5";
     static #flags = {                 // feature flags + fallback values
         "gameTheme": "ducks",         // the theme of the game
         "soundEnabled": true,         // all sounds on/off
@@ -773,7 +781,6 @@ class Game {
 
         // game channel messages:
         //   - players entering/leaving
-        //   - feature toggles: sound on/off, recharge timer on/off, sprite counts, etc
         this.gameChannel = null;
     }
 
@@ -781,15 +788,35 @@ class Game {
         return new ShootableSprite(this.spriteConfig.imgUrl, this.spriteConfig.sounds);
     }
 
+    playNewGameBGM(callback) {
+        Sounds.run.play(callback);
+    }
+
+    playGameOverBGM(callback) {
+        Sounds.run2.play(callback);
+    }
+
+    playBGM() {
+        Sounds.bgm.loop();
+    }
+
+    stopBGM() {
+        Sounds.bgm.stop();
+    }
+
     #gameThemeChanged(newTheme) {
         this.gameTheme = newTheme;
         switch (newTheme) {
             case "ducks":
+            default:
                 this.spriteConfig.imgUrl = "/img/duck.png";
                 this.spriteConfig.sounds.hit = Sounds.quack;
                 this.spriteConfig.sounds.falling = Sounds.falling;
                 this.spriteConfig.sounds.flyAway = Sounds.fly;
                 this.spriteConfig.sounds.landed = Sounds.ground;
+                //TODO:
+                //  - have diff/on/off bgm for kiosk vs. player? (maybe configure with flag rules) 
+                //  - handle different scenery images
                 break;
         }
         this.onGameThemeChanged();
@@ -808,12 +835,12 @@ class Game {
         el.style.pointerEvents = "auto";
         el.style.visibility = "visible";
         el.onclick = () => {
-          el.style.cursor = "none";
-          el.style.pointerEvents = "none";
-          el.style.visibility = "hidden";
-          callback();
+            el.style.cursor = "none";
+            el.style.pointerEvents = "none";
+            el.style.visibility = "hidden";
+            callback();
         };
-      }
+    }
 
     makeTitleScreenSprites() {
         const titleSpritesXYPositions = [

@@ -1,13 +1,12 @@
 "use strict";
 
-import { Game, Messages, Sight, Sounds, Timebar } from "./core.js";
+import { Game, Messages, Sight, Timebar } from "./core.js";
 
 class PlayerGame extends Game {
   constructor() {
     super();
 
     // player game-specific stuff
-    // this.gameCoverContainer = document.getElementById("gameCoverContainer");
     this.playerInfoContainer = document.getElementById("playerInfoContainer");
     this.playerName = document.getElementById("playerName");
     this.playerScore = document.getElementById("playerScore");
@@ -63,11 +62,10 @@ class PlayerGame extends Game {
     this.hideClouds();
     this.toggleTitleSprites(true);
     this.dog.showRunning();
-
-    Sounds.run.play(() => { // dont do ish until that jam ends. let the music play on play on play on...
+    this.playNewGameBGM(() => { // dont do ish until that jam ends. let the music play on play on play on...
       this.messages.showClickHere(() => {
-        Sounds.bgm.loop();
-        setTimeout(() => { Sounds.barkX3.play(); }, 1500);
+        this.playBGM();
+        setTimeout(() => { this.dog.bark(); }, 1500);
         this.prepareNewGame();
         this.startRound();
       });
@@ -137,15 +135,14 @@ class PlayerGame extends Game {
   timesUp() {
     this.messages.show(Messages.FlyAway);
     this.stopClouds();
+    this.dog.stopBarking();
     this.dog.hide();
     this.toggleShootingEnabled(false);
     this.sight.hide();
 
     Timebar.pause();
 
-    Sounds.barkX3.stop();
-    Sounds.bgm.stop();
-
+    this.stopBGM();
     this.spriteConfig.sounds.hit.stop();
     this.spriteConfig.sounds.flyAway.play();
 
@@ -154,7 +151,7 @@ class PlayerGame extends Game {
 
     setTimeout(() => {
       this.messages.show(Messages.GameOver);
-      Sounds.run2.play(() => {
+      this.playGameOverBGM(() => {
         setTimeout(() => {
           this.messages.hide();
           Timebar.toggleVisible(false);
@@ -184,11 +181,10 @@ class PlayerGame extends Game {
 
   toggleShootingEnabled(enabled) {
     this.shootingEnabled = enabled;
-    //this.sprites.style.cursor = (enabled) ? "pointer" : "none";
-    //(enabled) ? this.sprites.addEventListener("click", void (0)) : this.sprites.removeEventListener("click", void (0));
   }
 
   launchSprites(numberOfSprites, speedFactor) {
+    console.log(`launching ${numberOfSprites} sprites`);
     this.playerChannel.publish("launchSprites", { count: numberOfSprites });
     for (let i = 0; i < numberOfSprites; i++) {
       const sprite = this.makeShootableSprite();
@@ -271,19 +267,6 @@ class PlayerGame extends Game {
       }
     };
   }
-
-  // showGameCover(callback) {
-  //   const el = this.gameCoverContainer;
-  //   el.style.cursor = "pointer";
-  //   el.style.pointerEvents = "auto";
-  //   el.style.visibility = "visible";
-  //   el.onclick = () => {
-  //     el.style.cursor = "none";
-  //     el.style.pointerEvents = "none";
-  //     el.style.visibility = "hidden";
-  //     callback();
-  //   };
-  // }
 
   async #generateGamerTag() {
     const localStorageKey = "launch-duckly-tag";
