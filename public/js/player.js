@@ -37,7 +37,16 @@ class PlayerGame extends Game {
     //    - launching sprites
     //    - hit a sprite, send current score 
     //    - game over
-    this.playerChannel = null;
+    //this.playerChannel = null;
+
+    this.gameMessages = {
+      Enter: "enter",
+      Leave: "leave",
+      StartGame: "startGame",
+      LaunchSprites: "launchSprites",
+      Hit: "hit",
+      GameOver: "gameOver"
+    };
   }
 
   run() {
@@ -49,6 +58,9 @@ class PlayerGame extends Game {
   main() {
     this.makeTitleScreenSprites();
     Timebar.onTimesUp(() => { this.timesUp(); });
+
+    //this.socket.emit("enter", this.player);
+
     this.gameChannel.presence.enter({ player: this.player }).then(() => {
       this.playerChannel = this.RT.channels.get(`player-${this.RT.auth.clientId}`);
       this.setPlayerName(this.player.nickname);
@@ -184,8 +196,9 @@ class PlayerGame extends Game {
   }
 
   launchSprites(numberOfSprites, speedFactor) {
-    console.log(`launching ${numberOfSprites} sprites`);
+    console.log(`launching ${numberOfSprites} sprites for ${this.player.nickname}`);
     this.playerChannel.publish("launchSprites", { count: numberOfSprites });
+    //this.socket.emit("launchSprites", { player: this.player.nickname, count: numberOfSprites });
     for (let i = 0; i < numberOfSprites; i++) {
       const sprite = this.makeShootableSprite();
       this.spritesContainer.appendChild(sprite.el);

@@ -6,29 +6,37 @@ class KioskGame extends Game {
   constructor() {
     super();
     this.players = new Map();
+    this.kioskVisible = false;
     this.logoAreaContainer = document.getElementById("logoAreaContainer");
     this.gameInfoContainer = document.getElementById("gameInfoContainer");
     this.logContainer = document.getElementById("infoText");
     this.leadersContainer = document.getElementById("leaderText");
-    this.setupQRCodes();
   }
 
   main() {
-    this.messages.toggleTitle(true);
-    this.toggleLogoArea(false);
-    this.toggleTitleSprites(true);
-    this.toggleGameInfo(false);
-    this.toggleScrollingScenery(true);
-    this.animateClouds();
-    this.dog.showRunning();
+    this.makeTitleScreenSprites();
+    this.setupQRCodes();
+    this.toggleKioskGameUI(false);
 
-    this.gameChannel.subscribe("enter", (msg) => {
-      console.log(`${msg.data.player.nickname} entered`)
-
-      if (this.players.size == 0) { // first player in 
-        this.showKioskUI();
+    this.gameChannel.publish("kiosk", {});
+    this.gameChannel.subscribe("players", msg => {
+      const count = msg.data.count;
+      //console.log(`${count} players`);
+      if (count > 0) {
+        if (!this.kioskVisible) {
+          this.toggleKioskGameUI(true);
+        }
+      } else {
+        this.toggleKioskGameUI(false);
       }
+    });
+
+    this.gameChannel.presence.subscribe("enter", msg => {
       const player = msg.data.player;
+      //console.log(`${player.nickname} joined`);
+      if (this.players.size == 0) { // first player in 
+        this.toggleKioskGameUI(true);
+      }
       player.sprites = [];
       this.players.set(player.nickname, player);
       this.logPlayerJoined(player);
@@ -36,22 +44,40 @@ class KioskGame extends Game {
 
     this.gameChannel.subscribe("leave", (msg) => {
       const key = msg.data.player.nickname;
+      //console.log(`${key} left`);
+
       if (this.players.size > 0 && this.players.has(key)) {
+        //console.log(`deleting ${key} from players`);
         const player = this.players.get(key);
         this.playerSpritesFlyAway(player.sprites);
         this.logPlayerLeft(player);
         this.players.delete(player.nickname);
       }
+
+      //console.log('players.size', this.players.size);
+      if (this.players.size == 0) {
+        this.toggleKioskGameUI(false);
+      }
     });
 
     this.gameChannel.subscribe("launchSprites", (msg) => {
-      this.messages.hide();
-      let player = this.players.get(msg.data.player.nickname);
-      this.launchSprites(msg.data.count, player);
-      console.log(`launching ${msg.data.count} sprites for ${player.nickname}`);
+      const player = msg.data.player;
+      const count = msg.data.count;
+      //console.log(`launching ${count} sprites for ${player.nickname}`);
+
+      if (!this.players.has(player.nickname)) {
+        //console.log(`${player.nickname} not found`);
+        player.sprites = [];
+        this.players.set(player.nickname, player);
+        this.logPlayerJoined(player);
+      }
+
+      let gamePlayer = this.players.get(player.nickname);
+      this.launchSprites(msg.data.count, gamePlayer);
     });
 
     this.gameChannel.subscribe("hit", (msg) => {
+      //console.log('hit');
       const player = this.players.get(msg.data.player.nickname);
       if (player) {
         this.hitSprite(player);
@@ -60,8 +86,9 @@ class KioskGame extends Game {
 
     this.gameChannel.subscribe("gameOver", (msg) => {
       const key = msg.data.player.nickname;
-      const player = this.players.get(key);
-      if (player) {
+      //console.log(`game over ${key}`);
+      if (this.players.has(key)) {
+        const player = this.players.get(key);
         Sounds.fly.play();
         this.playerSpritesFlyAway(player.sprites);
         player.sprites = [];
@@ -70,18 +97,27 @@ class KioskGame extends Game {
     });
 
     this.gameChannel.subscribe("leaderboard", (msg) => {
-      this.updateLeaderboard(msg.data.leaderboard);
+      const leaderboard = msg.data.leaderboard;
+      //console.log("leaderboard", leaderboard);
+      this.updateLeaderboard(leaderboard);
     });
+
   }
 
-  showKioskUI() {
-    this.messages.toggleTitle(false);
-    this.toggleLogoArea(true);
-    this.toggleTitleSprites(false);
-    this.toggleGameInfo(true);
-    this.toggleScrollingScenery(false);
-    this.dog.stopAnimation();
-    this.dog.hide();
+  toggleKioskGameUI(visible) {
+    this.messages.toggleTitle(!visible);
+    this.toggleLogoArea(visible);
+    this.toggleTitleSprites(!visible);
+    this.toggleGameInfo(visible);
+    this.toggleScrollingScenery(!visible);
+    if (visible) {
+      this.dog.stopAnimation();
+      this.dog.hide();
+    } else {
+      this.dog.showRunning();
+      this.animateClouds();
+    }
+    this.kioskVisible = visible;
   }
 
   logPlayerJoined(player) {
@@ -149,6 +185,7 @@ class KioskGame extends Game {
   }
 
   launchSprites(numberOfSprites, player) {
+    //console.log(`launching ${numberOfSprites} sprites for ${player.nickname}`);
     for (let i = 0; i < numberOfSprites; i++) {
       let sprite = this.makeShootableSprite();
       this.spritesContainer.appendChild(sprite.el);

@@ -776,12 +776,12 @@ class Game {
             "/img/title.png"
         ];
 
-        // real-time communication
-        this.RT = null;
+      // real-time communication
+      this.RT = null;
 
-        // game channel messages:
-        //   - players entering/leaving
-        this.gameChannel = null;
+      // game channel messages:
+      //   - players entering/leaving
+      this.gameChannel = null;
     }
 
     makeShootableSprite() {

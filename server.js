@@ -16,9 +16,8 @@ const gameChannelName = "launch-duckly";
 const Messages = {
   Enter: "enter",
   Leave: "leave",
-  StartGame: "startGame",
-  LaunchSprites: "launchSprites",
-  Hit: "hit",
+  Kiosk: "kiosk",
+  Players: "players",
   GameOver: "gameOver",
   Leaderboard: "leaderboard"
 };
@@ -64,7 +63,7 @@ app.get("/nickname", (req, res) => {
   }).then(resp => {
     if (resp.ok) { return resp.json(); }
   }).then(json => {
-    if (json) { nickname = json[Math.floor(Math.random() * json.length)]; } 
+    if (json) { nickname = json[Math.floor(Math.random() * json.length)]; }
   }).catch(e => {
     console.error('Unable to create nickname', e);
   }).finally(() => {
@@ -72,28 +71,30 @@ app.get("/nickname", (req, res) => {
   });
 });
 
-app.get("/players", (req, res) => {
-  res.send(JSON.stringify({ count: players.size }));
-});
-
 RT.connection.once("connected", () => {
   console.log("Realtime messaging: connected");
   gameChannel = RT.channels.get(gameChannelName);
 
+  gameChannel.subscribe(Messages.Kiosk, () => {
+    //console.log('kiosk');
+    gameChannel.publish(Messages.Players, { count: players.size });
+    publishTopScores();
+  });
+
   gameChannel.presence.subscribe(Messages.Enter, (msg) => {
-    const player = { id: msg.clientId, nickname: msg.data.player.nickname, color: msg.data.player.color, score: 0 };
+    const player = {
+      id: msg.clientId,
+      nickname: msg.data.player.nickname,
+      color: msg.data.player.color, score: 0
+    };
     players.set(player.id, player);
     subscribeToPlayerMessages(player.id);
-    gameChannel.publish(Messages.Enter, { player: player });
-    gameChannel.publish(Messages.Leaderboard, { leaderboard: leaderboard });
   });
 
   gameChannel.presence.subscribe(Messages.Leave, (msg) => {
     publishTopScores();
-    const player = players.get(msg.clientId);
-    if (player != undefined) {
-      gameChannel.publish(Messages.Leave, { player: player });
-      players.delete(player.id);
+    if (players.has(msg.clientId)) {
+      players.delete(msg.clientId);
     }
   });
 });
@@ -102,25 +103,16 @@ function subscribeToPlayerMessages(playerId) {
   playerChannels.set(playerId, RT.channels.get("player-" + playerId));
   const channel = playerChannels.get(playerId);
 
-  channel.subscribe(Messages.LaunchSprites, (msg) => {
-    gameChannel.publish(Messages.LaunchSprites, { player: players.get(msg.clientId), count: msg.data.count });
-  });
-
-  channel.subscribe(Messages.Hit, (msg) => {
-    players.get(msg.clientId).score++;
-    gameChannel.publish(Messages.Hit, { player: players.get(msg.clientId) });
-  });
-
   channel.subscribe(Messages.GameOver, (msg) => {
     const player = players.get(msg.clientId);
-    gameChannel.publish(Messages.GameOver, { player: player });
     publishTopScores();
     player.score = 0;
   });
 }
 
 function publishTopScores() {
-  players.forEach((player, key) => {
+  //console.log('publish leaderboard');
+  players.forEach((player) => {
     if (player.score > 0) {
       const leader = leaderboard.find(l => l.nickname == player.nickname);
       if (leader) { //player is already on the leaderboard
