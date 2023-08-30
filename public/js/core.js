@@ -51,7 +51,7 @@ class Sounds {
         // ducks
         'barkX3', 'bgm', 'falling', 'fly', 'ground', 'quack', 'run', 'run2', 'shoot',
         // space
-        'space_fly', 'space_falling', 'space_ground', 'space_hit', 'space_killed', 'space_panic'
+        'space_fly','space_bgm', 'space_newgame', 'space_gameover', 'space_falling', 'space_ground', 'space_hit', 'space_killed', 'space_panic'
     ];
     static #context = new (window.AudioContext || window.webkitAudioContext)();
     static {
@@ -916,9 +916,9 @@ class Game {
         switch (this.gameTheme) {
             case "space":
                 this.sounds.flyAway = Sounds.space_fly;
-                this.music.bgm = Sounds.bgm;
-                this.music.gameOver = Sounds.run2;
-                this.music.newGame = Sounds.run;
+                this.music.bgm = Sounds.space_bgm;
+                this.music.gameOver = Sounds.space_gameover;
+                this.music.newGame = Sounds.space_newgame;
 
                 this.mountains.style.backgroundImage = `url('/img/mountains.png')`;
                 this.scenery.style.backgroundImage = `url('/img/scenery.png')`;

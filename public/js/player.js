@@ -201,22 +201,11 @@ class PlayerGame extends Game {
       sprite.animate();
       sprite.flyAround(speedFactor);
     }
-
-    // let temp;
-    // this.sprites.forEach((v) => {
-    //   if (temp) {
-    //     console.log(temp);
-    //     console.log(temp.sounds);
-    //     console.log('same quack?', v.sounds === temp.sounds);
-    //   } else temp = v;
-    // });
-
   }
 
   wireUpSpriteEvents(sprite) {
     sprite.onHit(s => {
       if (this.shootingEnabled) {
-        //this.playerChannel.publish("hit", {});
         if (this.round > 1) {
           Timebar.add(this.timeRewardFactor);
         }

@@ -21,7 +21,6 @@ class KioskGame extends Game {
     this.gameChannel.publish("kiosk", {});
     this.gameChannel.subscribe("players", msg => {
       const count = msg.data.count;
-      //console.log(`${count} players`);
       if (count > 0) {
         if (!this.kioskVisible) {
           this.toggleKioskGameUI(true);
