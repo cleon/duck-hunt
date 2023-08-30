@@ -33,11 +33,8 @@ class PlayerGame extends Game {
       color: { bg: "#000000", text: "#ffffff" }
     };
 
-    // player channel used to publish messages:
-    //    - launching sprites
-    //    - hit a sprite, send current score 
-    //    - game over
-    //this.playerChannel = null;
+    // player channel used to publish messages
+    this.playerChannel = null;
 
     this.gameMessages = {
       Enter: "enter",
@@ -59,8 +56,6 @@ class PlayerGame extends Game {
     this.makeTitleScreenSprites();
     Timebar.onTimesUp(() => { this.timesUp(); });
 
-    //this.socket.emit("enter", this.player);
-
     this.gameChannel.presence.enter({ player: this.player }).then(() => {
       this.playerChannel = this.RT.channels.get(`player-${this.RT.auth.clientId}`);
       this.setPlayerName(this.player.nickname);
@@ -74,7 +69,7 @@ class PlayerGame extends Game {
     this.hideClouds();
     this.toggleTitleSprites(true);
     this.dog.showRunning();
-    this.playNewGameBGM(() => { // dont do ish until that jam ends. let the music play on play on play on...
+    this.playNewGameMusic(() => { // dont do ish until that jam ends. let the music play on play on play on...
       this.messages.showClickHere(() => {
         this.playBGM();
         setTimeout(() => { this.dog.bark(); }, 1500);
@@ -147,7 +142,7 @@ class PlayerGame extends Game {
   timesUp() {
     this.messages.show(Messages.FlyAway);
     this.stopClouds();
-    this.dog.stopBarking();
+    //this.dog.stopBarking();
     this.dog.hide();
     this.toggleShootingEnabled(false);
     this.sight.hide();
@@ -155,8 +150,7 @@ class PlayerGame extends Game {
     Timebar.pause();
 
     this.stopBGM();
-    this.spriteConfig.sounds.hit.stop();
-    this.spriteConfig.sounds.flyAway.play();
+    this.playFlyAwaySound();
 
     this.sprites.forEach(sprite => sprite.flyAway());
     this.playerChannel.publish("gameOver", {});
@@ -196,9 +190,8 @@ class PlayerGame extends Game {
   }
 
   launchSprites(numberOfSprites, speedFactor) {
-    console.log(`launching ${numberOfSprites} sprites for ${this.player.nickname}`);
     this.playerChannel.publish("launchSprites", { count: numberOfSprites });
-    //this.socket.emit("launchSprites", { player: this.player.nickname, count: numberOfSprites });
+
     for (let i = 0; i < numberOfSprites; i++) {
       const sprite = this.makeShootableSprite();
       this.spritesContainer.appendChild(sprite.el);
@@ -208,30 +201,42 @@ class PlayerGame extends Game {
       sprite.animate();
       sprite.flyAround(speedFactor);
     }
+
+    // let temp;
+    // this.sprites.forEach((v) => {
+    //   if (temp) {
+    //     console.log(temp);
+    //     console.log(temp.sounds);
+    //     console.log('same quack?', v.sounds === temp.sounds);
+    //   } else temp = v;
+    // });
+
   }
 
   wireUpSpriteEvents(sprite) {
-    sprite.onShot(s => {
+    sprite.onHit(s => {
       if (this.shootingEnabled) {
+        //this.playerChannel.publish("hit", {});
         if (this.round > 1) {
           Timebar.add(this.timeRewardFactor);
         }
-        this.sprites.delete(s.id);
-        this.score++;
-        this.setPlayerScore(this.score);
-        this.playerChannel.publish("hit", {});
-        if (this.sprites.size == 0) {
-          if (!Timebar.timesUp()) {
-            Timebar.pause();
-            if (this.lastSpriteGoesCrazy) {
-              this.spriteConfig.sounds.hit.stop();
-            }
-          }
-        } else if (this.sprites.size == 1 && this.lastSpriteGoesCrazy) {
-          const lastSprite = this.sprites.values().next().value;
-          lastSprite.movementSpeed *= 1.5;
-          this.spriteConfig.sounds.hit.loop();
+      }
+    });
+
+    sprite.onKilled(s => {
+      this.sprites.delete(s.id);
+      this.score++;
+      this.setPlayerScore(this.score);
+
+      this.playerChannel.publish("kill", {});
+
+      if (this.sprites.size == 0) {
+        if (!Timebar.timesUp()) {
+          Timebar.pause();
         }
+      } else if (this.sprites.size == 1 && this.lastSpriteGoesCrazy) {
+        const lastSprite = this.sprites.values().next().value;
+        lastSprite.panic();
       }
     });
 

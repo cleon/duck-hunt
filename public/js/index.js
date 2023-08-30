@@ -72,33 +72,31 @@ class KioskGame extends Game {
         this.logPlayerJoined(player);
       }
 
-      let gamePlayer = this.players.get(player.nickname);
-      this.launchSprites(msg.data.count, gamePlayer);
+      const gamePlayer = this.players.get(player.nickname);
+      this.launchSprites(count, gamePlayer);
     });
 
-    this.gameChannel.subscribe("hit", (msg) => {
+    this.gameChannel.subscribe("kill", (msg) => {
       //console.log('hit');
       const player = this.players.get(msg.data.player.nickname);
       if (player) {
-        this.hitSprite(player);
+        this.killSprite(player);
       }
     });
 
     this.gameChannel.subscribe("gameOver", (msg) => {
       const key = msg.data.player.nickname;
-      //console.log(`game over ${key}`);
       if (this.players.has(key)) {
         const player = this.players.get(key);
-        Sounds.fly.play();
         this.playerSpritesFlyAway(player.sprites);
-        player.sprites = [];
         this.logPlayerGameOver(player);
+        player.sprites = [];
+        Sounds.fly.play();
       }
     });
 
     this.gameChannel.subscribe("leaderboard", (msg) => {
       const leaderboard = msg.data.leaderboard;
-      //console.log("leaderboard", leaderboard);
       this.updateLeaderboard(leaderboard);
     });
 
@@ -175,7 +173,7 @@ class KioskGame extends Game {
     this.logoAreaContainer.style.visibility = (visible) ? "visible" : "hidden";
   }
 
-  hitSprite(player) {
+  killSprite(player) {
     if (player.sprites.length > 0) {
       player.sprites[0].shoot();
       player.sprites.shift();

@@ -17,6 +17,12 @@
     }
 }
 
+@keyframes blink {
+    to {
+        background-image: none;
+    }
+}
+
 * {
     box-sizing: border-box;
 }
@@ -43,6 +49,10 @@ body {
     visibility: hidden;
     z-index: -6;
     background-repeat: no-repeat;
+}
+
+.blink {
+    animation: blink 0.1s steps(5, start) infinite;
 }
 
 #gameCoverContainer {
@@ -332,7 +342,6 @@ body {
     background-position: left bottom;
     background-size: contain;
     background-repeat: repeat-x;
-    background-image: url('/img/mountains.png');
     z-index: -7;
 }
 
@@ -345,7 +354,6 @@ body {
     height: 800px;
     background-position: left bottom;
     background-repeat: repeat-x;
-    background-image: url('/img/scenery.png');
 }
 
 #messageContainer {

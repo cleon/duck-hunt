@@ -47,55 +47,69 @@ class Messages {
 }
 
 class Sounds {
-    static #files = ['barkX3', 'bgm', 'falling', 'fly', 'ground', 'quack', 'run', 'run2', 'shoot'];
-    static #context = null;
+    static #files = [
+        // ducks
+        'barkX3', 'bgm', 'falling', 'fly', 'ground', 'quack', 'run', 'run2', 'shoot',
+        // space
+        'space_fly', 'space_falling', 'space_ground', 'space_hit', 'space_killed', 'space_panic'
+    ];
+    static #context = new (window.AudioContext || window.webkitAudioContext)();
     static {
-        this.#context = new (window.AudioContext || window.webkitAudioContext)();
         this.#unlockAudioContext();
-        let ctx = this.#context;
+        const emptyBuffer = this.#context.createBuffer(1, 1, 22050);
+
         for (let file of this.#files) {
+            let ctx = this.#context;
+
             let sound = {};
-            sound.buffer = null;
-            sound.nodes = [];
             sound.vol = ctx.createGain();
             sound.vol.gain.value = 1;
             sound.vol.connect(ctx.destination);
+            sound.nodes = {};
 
-            sound.play = function (endedCallback = null) {
+            sound.play = function (endedCallback = null, loop = false) {
                 let snd = ctx.createBufferSource();
+                snd.id = Math.floor(Date.now() * Math.random());
                 snd.buffer = sound.buffer;
+                snd.loop = loop;
+                sound.nodes[snd.id] = snd;
                 snd.connect(sound.vol);
-                if (endedCallback) {
-                    if (snd.onended) {
-                        snd.onended = () => { endedCallback(); };
-                    } else {
-                        snd.addEventListener("ended", () => { endedCallback(); });
+                snd.addEventListener("ended", () => {
+                    if (endedCallback) {
+                        endedCallback();
                     }
-                }
+                    cleanUpBehindNode(snd);
+                });
+
                 ctx.resume();
                 snd.start();
-                sound.nodes.push(snd);
-                return snd;
+                return snd.id;
             };
 
             sound.loop = function () {
-                let snd = ctx.createBufferSource();
-                snd.buffer = sound.buffer;
-                snd.connect(sound.vol);
-                snd.loop = true;
-                sound.nodes.push(snd);
-                snd.start();
-                return snd;
-            }
+                return sound.play(null, true);
+            };
 
-            sound.stop = function () {
-                sound.nodes.forEach(node => { node.stop(); node.disconnect(); });
+            sound.stop = function (id) {
+                const snd = sound.nodes[id];
+                if (snd) { snd.stop(); }
             };
 
             sound.mute = function (muted = true) {
                 const value = (muted) ? 0 : 1;
                 sound.vol.gain.value = value;
             };
+
+            function cleanUpBehindNode(snd) {
+                snd.loop = false;
+                snd.onended = null;
+                snd.stop();
+                snd.disconnect();
+                try { snd.buffer = emptyBuffer; } catch { }
+                sound.nodes[snd.id] = null;
+                delete sound.nodes[snd.id];
+                snd = null;
+            }
 
             this[file] = sound;
         }
@@ -104,7 +118,7 @@ class Sounds {
     static async load() {
         await Promise.all(this.#files.map(async (file) => {
             const bytes = await fetch(`/snd/${file}.mp3`).then(res => res.arrayBuffer());
-            this[file].buffer = await Sounds.#context.decodeAudioData(bytes);
+            this[file].buffer = await this.#context.decodeAudioData(bytes);
         }));
     }
 
@@ -124,11 +138,12 @@ class Sounds {
 class Sprite {
     static #uid = 0;
     constructor(height = 0, width = 0, x = 0, y = 0, imgUrl, id = null) {
-        this.id = id || Sprite.#uid++;
         this.height = height;
         this.width = width;
         this.x = x;
         this.y = y;
+        this.imgUrl = imgUrl;
+        this.id = id || Sprite.#uid++;
 
         this.el = document.createElement('div');
         this.el.id = this.id;
@@ -137,7 +152,7 @@ class Sprite {
         this.el.style.width = `${this.width}px`;
         this.el.style.top = `${y}px`;
         this.el.style.left = `${x}px`;
-        this.el.style.backgroundImage = `url('${imgUrl}')`;
+        this.el.style.backgroundImage = this.imgUrl ? `url('${this.imgUrl}')` : "";
 
         this.animationTimeoutDelay = 0;
         this.animationTimeout = 0;
@@ -165,6 +180,11 @@ class Sprite {
 
     placeBackgroundImage(x, y) {
         this.el.style.backgroundPosition = `${x}px -${y}px`;
+    }
+
+    setBackgroundImageUrl(imgUrl) {
+        this.imgUrl = imgUrl;
+        this.el.style.backgroundImage = `url('${this.imgUrl}')`;
     }
 
     setHeightWidth(h = this.el.style.height, w = this.el.style.width) {
@@ -211,10 +231,13 @@ class Cloud extends Sprite {
 }
 
 class ShootableSprite extends Sprite {
-    constructor(imgUrl, sounds) {
+    constructor(imgUrl, sounds, hitsToKill) {
         const x = ShootableSprite.#rand(1000);
         const y = window.innerHeight - 250;
         super(102, 102, x, y, imgUrl);
+
+        this.hitsToKill = hitsToKill;
+        this.hitCount = 0;
 
         this.el.style.pointerEvents = "auto";
         this.el.onclick = () => {
@@ -277,19 +300,22 @@ class ShootableSprite extends Sprite {
         this.flyAroundCounter = 140;
         this.sensitivityX = 0;
         this.sensitivityY = 0;
-        this.movementSpeed = 5;
+        this.defaultMovementSpeed = 5;
+        this.movementSpeed = this.defaultMovementSpeed;
         this.invincible = false;
 
         // init to a random color
         this.color = this.colors[ShootableSprite.#rand(2)];
 
         // sounds
-        this.sounds = {
-            hit: sounds.hit,
-            falling: sounds.falling,
-            flyAway: sounds.flyAway,
-            landed: sounds.landed
-        };
+        this.sounds = sounds;
+
+        // ptr to the looped panic sound
+        this.panicSound = null;
+    }
+
+    setSounds(sounds) {
+        this.sounds = sounds;
     }
 
     animateSprite() {
@@ -362,10 +388,11 @@ class ShootableSprite extends Sprite {
 
     stopFlying() {
         clearTimeout(this.flyAroundTimeout);
+        this.movementSpeed = this.defaultMovementSpeed;
     }
 
     fallToTheGround() {
-        const threshold = window.innerHeight - 200;//135
+        const threshold = window.innerHeight - 200;
         this.animationFrames = [1, 2];
         this.currentAnimationSequence = this.animationSequence.Falling;
         this.currentAnimationFrame = 0;
@@ -378,7 +405,7 @@ class ShootableSprite extends Sprite {
         (function makeSpriteFall() {
             setTimeout(() => {
                 if (sprite.y > threshold) {
-                    sprite.sounds.falling.stop();
+                    //sprite.sounds.falling.stop();
                     sprite.#landed();
                 } else {
                     sprite.#move(2); // move twice as fast when falling
@@ -392,6 +419,7 @@ class ShootableSprite extends Sprite {
         let sprite = this;
         sprite.stopFlying();
         sprite.stopAnimation();
+        sprite.stopPanicSound();
         sprite.sensitivityX = 0;
         sprite.sensitivityY = 0;
         sprite.el.style.pointerEvents = "none";
@@ -436,23 +464,46 @@ class ShootableSprite extends Sprite {
         super.move(this.x, this.y);
     }
 
+    panic() {
+        this.movementSpeed *= 1.5;
+        this.panicSound = this.sounds.panic.loop();
+    }
+
+    stopPanicSound() {
+        if (this.panicSound) {
+            this.sounds.panic.stop(this.panicSound);
+        }
+    }
+
     shoot() {
         if (!this.invincible) {
-            this.invincible = true;
+            this.hitCount++;
+            if (this.hitCount == this.hitsToKill) { // killed
+                this.invincible = true;
+                this.el.classList.remove("blink");
+                this.el.style.pointerEvents = "none";
+                this.#raiseEvent("killed", { sprite: this });
 
-            this.#raiseEvent("shot", { sprite: this });
-            this.el.style.pointerEvents = "none";
+                this.stopPanicSound()
+                this.sounds.killed.play();
 
-            this.stopFlying();
-            this.currentAnimationFrame = 0;
-            this.currentAnimationSequence = this.animationSequence.Hit;
+                this.stopFlying();
+                this.currentAnimationFrame = 0;
+                this.currentAnimationSequence = this.animationSequence.Hit;
 
-            this.sounds.hit.play();
+                setTimeout(() => {
+                    this.stopAnimation();
+                    this.fallToTheGround();
+                }, 500);
 
-            setTimeout(() => {
-                this.stopAnimation();
-                this.fallToTheGround();
-            }, 500);
+            } else { // hit
+                this.#raiseEvent("hit", { sprite: this });
+                this.sounds.hit.play();
+                this.el.classList.add("blink");
+                setTimeout(() => {
+                    this.el.classList.remove("blink");
+                }, 1000);
+            }
         }
     }
 
@@ -476,8 +527,12 @@ class ShootableSprite extends Sprite {
         this.el.dispatchEvent(new CustomEvent(name, { detail: detail }));
     }
 
-    onShot(callback) {
-        this.el.addEventListener("shot", () => { callback(this); });
+    onKilled(callback) {
+        this.el.addEventListener("killed", () => { callback(this); });
+    }
+
+    onHit(callback) {
+        this.el.addEventListener("hit", () => { callback(this); });
     }
 
     onLanded(callback) {
@@ -511,8 +566,8 @@ class Sight extends Sprite {
     }
 
     animateSprite() {
-        this.el.style.backgroundPosition = (this.backgroundPosition++ === 0 ? "0px 0px" : "-33px 0px");
-        if (this.backgroundPosition === 2) { this.backgroundPosition = 0; }
+        this.el.style.backgroundPosition = (this.backgroundPosition++ == 0 ? "0px 0px" : "-33px 0px");
+        if (this.backgroundPosition == 2) { this.backgroundPosition = 0; }
     }
 
     move(x, y) {
@@ -531,8 +586,8 @@ class Sight extends Sprite {
 class Dog extends Sprite {
     static #distanceUpFromBottom = 345;
 
-    constructor() {
-        super(150, 90, 0, 0, "/img/dog.png", "dog");
+    constructor(imgUrl = null) {
+        super(150, 90, 0, 0, imgUrl, "dog");
         this.el.style.bottom = "200px";
         this.el.style.removeProperty("top");
         this.el.style.removeProperty("left");
@@ -543,6 +598,7 @@ class Dog extends Sprite {
         this.animationTimeoutDelay = 70;
         this.isFetching = false;
         this.isRunning = false;
+        this.barkSound = Sounds.barkX3;
     }
 
     animateSprite() {
@@ -620,11 +676,11 @@ class Dog extends Sprite {
     }
 
     bark() {
-        Sounds.barkX3.play();
+        this.barkSound.play();
     }
 
     stopBarking() {
-        Sounds.barkX3.stop();
+        //this.barkSound.stop();
     }
 }
 
@@ -699,7 +755,8 @@ class Features {
         "spritesToLaunch": 5,         // initial number of sprites per round
         "flockMultiplier": 1.5,       // number of sprites increased per round
         "speedMultiplier": 0.2,       // clock speed and sprite flight speed multiplier
-        "lastSpriteGoesCrazy": true   // make the last sprte harder to kill and noisier
+        "lastSpriteGoesCrazy": true,  // make the last sprte harder to kill and noisier
+        "hitsToKill": 1               // the number of hits it takes to kill a sprite 
     };
     static #ldclient = null;
     static {
@@ -734,32 +791,34 @@ class Game {
         // game cover
         this.gameCoverContainer = document.getElementById("gameCoverContainer");
 
-        //sprites
+        // sprites
         this.spritesContainer = document.getElementById("spritesContainer");
-        this.spriteConfig = { imgUrl: null, sounds: { hit: null } };
 
-        //clouds
+        // clouds
         this.clouds = [new Cloud(window.innerWidth - 400, 50, 0.25), new Cloud(window.innerWidth - 250, 150, 0.1)];
         this.clouds.forEach(cloud => this.spritesContainer.appendChild(cloud.el));
 
-        //dog
+        // dog
         this.dog = new Dog();
         this.spritesContainer.appendChild(this.dog.el);
 
-        //title screen sprites
+        // title screen sprites
         this.titleScreenSprites = [];
 
-        //scenery
+        // scenery
         this.scenery = document.getElementById("scenery");
         this.scrollSceneryTimeout = 0;
         this.scrollSceneryInterval = 16;
         this.scrollSceneryX = 0;
         this.sceneryIsScrolling = false;
 
-        //messages
+        // mountains
+        this.mountains = document.getElementById("mountains");
+
+        // messages
         this.messages = new Messages();
 
-        //images
+        // images
         this.images = [
             "/img/blueTimeBar.png",
             "/img/cloud.png",
@@ -776,57 +835,115 @@ class Game {
             "/img/title.png"
         ];
 
-      // real-time communication
-      this.RT = null;
+        // real-time communication
+        this.RT = null;
 
-      // game channel messages:
-      //   - players entering/leaving
-      this.gameChannel = null;
+        // game channel messages:
+        //   - players entering/leaving
+        this.gameChannel = null;
+
+        // general game sounds
+        this.sounds = {
+            flyAway: null
+        };
+
+        // game music
+        this.music = {
+            bgm: null,
+            bgmId: null,
+            gameOver: null,
+            newGame: null
+        };
     }
 
     makeShootableSprite() {
-        return new ShootableSprite(this.spriteConfig.imgUrl, this.spriteConfig.sounds);
+        let config = this.#makeNewSpriteConfig();
+        return new ShootableSprite(config.imgUrl, config.sounds, config.hitsToKill);
     }
 
-    playNewGameBGM(callback) {
-        Sounds.run.play(callback);
+    playNewGameMusic(callback) {
+        this.music.newGame.play(callback);
     }
 
     playGameOverBGM(callback) {
-        Sounds.run2.play(callback);
+        this.music.gameOver.play(callback);
     }
 
     playBGM() {
-        Sounds.bgm.loop();
+        this.music.bgmId = this.music.bgm.loop();
     }
 
     stopBGM() {
-        Sounds.bgm.stop();
+        this.music.bgm.stop(this.music.bgmId);
+    }
+
+    playFlyAwaySound() {
+        this.sounds.flyAway.play();
+    }
+
+    #makeNewSpriteConfig() {
+        let config = { hitsToKill: this.hitsToKill, sounds: {} };
+        switch (this.gameTheme) {
+            case "space":
+                config.imgUrl = "/img/duck.png";
+                config.sounds.hit = Sounds.space_hit;
+                config.sounds.killed = Sounds.space_killed;
+                config.sounds.falling = Sounds.space_falling;
+                config.sounds.flyAway = Sounds.space_fly;
+                config.sounds.landed = Sounds.space_ground;
+                config.sounds.panic = Sounds.space_panic;
+                break;
+            case "ducks":
+            default:
+                config.imgUrl = "/img/duck.png";
+                config.sounds.hit = Sounds.quack;
+                config.sounds.killed = Sounds.quack;
+                config.sounds.falling = Sounds.falling;
+                config.sounds.flyAway = Sounds.fly;
+                config.sounds.landed = Sounds.ground;
+                config.sounds.panic = Sounds.quack;
+                break;
+        }
+        return config;
+    }
+
+    // let subclasses know the theme changed
+    onGameThemeChanged() { // update existing sprites
     }
 
     #gameThemeChanged(newTheme) {
         this.gameTheme = newTheme;
-        switch (newTheme) {
+        switch (this.gameTheme) {
+            case "space":
+                this.sounds.flyAway = Sounds.space_fly;
+                this.music.bgm = Sounds.bgm;
+                this.music.gameOver = Sounds.run2;
+                this.music.newGame = Sounds.run;
+
+                this.mountains.style.backgroundImage = `url('/img/mountains.png')`;
+                this.scenery.style.backgroundImage = `url('/img/scenery.png')`;
+
+                this.dog.setBackgroundImageUrl("/img/dog.png");
+                break;
             case "ducks":
             default:
-                this.spriteConfig.imgUrl = "/img/duck.png";
-                this.spriteConfig.sounds.hit = Sounds.quack;
-                this.spriteConfig.sounds.falling = Sounds.falling;
-                this.spriteConfig.sounds.flyAway = Sounds.fly;
-                this.spriteConfig.sounds.landed = Sounds.ground;
-                //TODO:
-                //  - have diff/on/off bgm for kiosk vs. player? (maybe configure with flag rules) 
-                //  - handle different scenery images
+                this.sounds.flyAway = Sounds.fly;
+                this.music.bgm = Sounds.bgm;
+                this.music.gameOver = Sounds.run2;
+                this.music.newGame = Sounds.run;
+
+                this.mountains.style.backgroundImage = `url('/img/mountains.png')`;
+                this.scenery.style.backgroundImage = `url('/img/scenery.png')`;
+
+                this.dog.setBackgroundImageUrl("/img/dog.png");
                 break;
         }
+
         this.onGameThemeChanged();
     }
 
     #soundEnabledChanged(enabled) {
         Sounds.muteAll(!enabled);
-    }
-
-    onGameThemeChanged() {
     }
 
     showGameCover(callback) {
@@ -910,16 +1027,14 @@ class Game {
         }
     }
 
-    async loadFeatureFlags() {
+    async loadFlaggableFeatures() {
         this.gameTheme = await Features.gameTheme.value();
         this.soundEnabled = await Features.soundEnabled.value();
         this.spritesToLaunch = await Features.spritesToLaunch.value();
         this.flockMultiplier = await Features.flockMultiplier.value();
         this.speedMultiplier = await Features.speedMultiplier.value();
         this.lastSpriteGoesCrazy = await Features.lastSpriteGoesCrazy.value();
-
-        this.#gameThemeChanged(this.gameTheme);
-        this.#soundEnabledChanged(this.soundEnabled);
+        this.hitsToKill = await Features.hitsToKill.value();
 
         Features.gameTheme.onChange(current => this.#gameThemeChanged(current));
         Features.soundEnabled.onChange(current => this.#soundEnabledChanged(current));
@@ -927,6 +1042,10 @@ class Game {
         Features.flockMultiplier.onChange(current => this.flockMultiplier = current);
         Features.speedMultiplier.onChange(current => this.speedMultiplier = current);
         Features.lastSpriteGoesCrazy.onChange(current => this.lastSpriteGoesCrazy = current);
+        Features.hitsToKill.onChange(current => this.hitsToKill = current);
+
+        this.#gameThemeChanged(this.gameTheme);
+        this.#soundEnabledChanged(this.soundEnabled);
     }
 
     async initRT() {
@@ -950,11 +1069,11 @@ class Game {
 
     async loadAssets() {
         try {
-            await this.loadFeatureFlags();
+            await Sounds.load();
             await this.initRT();
             await this.loadImages();
-            await Sounds.load();
             await this.loadFonts();
+            await this.loadFlaggableFeatures();
         } catch (e) {
             console.error('Unable to load assets', e);
         }
@@ -974,4 +1093,4 @@ class Game {
     }
 }
 
-export { Game, Messages, Sounds, Sight, Timebar };
+export { Game, Messages, Sounds as Sounds, Sight, Timebar };
