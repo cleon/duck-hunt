@@ -72,7 +72,7 @@ class PlayerGame extends Game {
     this.dog.showRunning();
     this.playNewGameMusic(() => { // dont do ish until that jam ends. let the music play on play on play on...
       this.messages.showClickHere(() => {
-        this.playBGM();
+        this.loopBGM();
         setTimeout(() => { this.dog.bark(); }, 1500);
         this.prepareNewGame();
         this.startRound();
@@ -145,7 +145,7 @@ class PlayerGame extends Game {
     this.stopBGM();
     // play time warning sound/song
     // restart BGM at higher speed
-    this.playBGM(Sounds.HurryUpSpeed);
+    this.loopBGM(Sounds.HurryUpSpeed);
   }
 
   timesUp() {
