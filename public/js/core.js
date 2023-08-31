@@ -51,9 +51,10 @@ class Sounds {
         // ducks
         'barkX3', 'bgm', 'falling', 'fly', 'ground', 'quack', 'run', 'run2', 'shoot',
         // space
-        'space_fly','space_bgm', 'space_newgame', 'space_gameover', 'space_falling', 'space_ground', 'space_hit', 'space_killed', 'space_panic'
+        'space_fly', 'space_bgm', 'space_newgame', 'space_gameover', 'space_falling', 'space_ground', 'space_hit', 'space_killed', 'space_panic'
     ];
     static #context = new (window.AudioContext || window.webkitAudioContext)();
+    static HurryUpSpeed = 1.05;
     static {
         this.#unlockAudioContext();
         const emptyBuffer = this.#context.createBuffer(1, 1, 22050);
@@ -67,11 +68,12 @@ class Sounds {
             sound.vol.connect(ctx.destination);
             sound.nodes = {};
 
-            sound.play = function (endedCallback = null, loop = false) {
+            sound.play = function (endedCallback = null, loop = false, playbackRate = 1) {
                 let snd = ctx.createBufferSource();
                 snd.id = Math.floor(Date.now() * Math.random());
                 snd.buffer = sound.buffer;
                 snd.loop = loop;
+                snd.playbackRate.value = playbackRate;
                 sound.nodes[snd.id] = snd;
                 snd.connect(sound.vol);
                 snd.addEventListener("ended", () => {
@@ -86,8 +88,8 @@ class Sounds {
                 return snd.id;
             };
 
-            sound.loop = function () {
-                return sound.play(null, true);
+            sound.loop = function (playbackRate = 1) {
+                return sound.play(null, true, playbackRate);
             };
 
             sound.stop = function (id) {
@@ -689,6 +691,8 @@ class Timebar {
     static #redbar = null;
     static #timeout = 0;
     static #startPos = 342;
+    static #timeSize = 6;
+    static #tickSpeed = 500;
     static #pos = 0;
 
     static {
@@ -709,12 +713,15 @@ class Timebar {
     }
 
     static start(factor = 1) {
-        const speed = 500 / factor;
-        this.#pos -= 6;
+        const speed = this.#tickSpeed / factor;
+        const lowTimeThreshold = Math.round(this.#startPos / 3);
+       
+        this.#pos -= this.#timeSize;
         this.#setLeft(this.#pos);
         if (this.#pos <= 0) {
-            this.#el.dispatchEvent(new CustomEvent("timesup", { detail: null }));
+            this.#el.dispatchEvent(new CustomEvent("timesup"));
         } else {
+            if (this.#pos == lowTimeThreshold) { this.#el.dispatchEvent(new CustomEvent("timesrunningout")); }
             this.#timeout = setTimeout(() => {
                 this.start(factor);
             }, speed)
@@ -726,8 +733,8 @@ class Timebar {
     }
 
     static add(time = 0) {
-        if (this.#pos <= 324) {
-            this.#pos += (time * 6);
+        if (this.#pos <= this.#startPos) {
+            this.#pos += (time * this.#timeSize);
             this.#setLeft(this.#pos);
         }
     }
@@ -740,6 +747,18 @@ class Timebar {
         clearTimeout(this.#timeout);
         this.#pos = this.#startPos;
         this.#setLeft(this.#pos);
+    }
+
+    static toggleTimesRunningOut(on) {
+        if (on) {
+            //style the timer to show low time
+        } else {
+            //remove low time styling
+        }
+    }
+
+    static onTimesRunningOut(callback) {
+        this.#el.addEventListener("timesrunningout", (e) => { callback(e); });
     }
 
     static onTimesUp(callback) {
@@ -869,8 +888,8 @@ class Game {
         this.music.gameOver.play(callback);
     }
 
-    playBGM() {
-        this.music.bgmId = this.music.bgm.loop();
+    playBGM(playbackRate = 1) {
+        this.music.bgmId = this.music.bgm.loop(playbackRate);
     }
 
     stopBGM() {

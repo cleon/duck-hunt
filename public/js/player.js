@@ -1,6 +1,6 @@
 "use strict";
 
-import { Game, Messages, Sight, Timebar } from "./core.js";
+import { Game, Messages, Sight, Sounds, Timebar } from "./core.js";
 
 class PlayerGame extends Game {
   constructor() {
@@ -55,6 +55,7 @@ class PlayerGame extends Game {
   main() {
     this.makeTitleScreenSprites();
     Timebar.onTimesUp(() => { this.timesUp(); });
+    Timebar.onTimesRunningOut(() => { this.timesRunningOut(); });
 
     this.gameChannel.presence.enter({ player: this.player }).then(() => {
       this.playerChannel = this.RT.channels.get(`player-${this.RT.auth.clientId}`);
@@ -137,6 +138,14 @@ class PlayerGame extends Game {
       this.spriteFlightSpeedFactor = this.spriteFlightSpeedFactor + (this.spriteFlightSpeedFactor * this.speedMultiplier);
       this.timeRewardFactor = this.timeRewardFactor + Math.round(this.timeRewardFactor * this.speedMultiplier);
     }
+  }
+
+  timesRunningOut() {
+    // stop BGM
+    this.stopBGM();
+    // play time warning sound/song
+    // restart BGM at higher speed
+    this.playBGM(Sounds.HurryUpSpeed);
   }
 
   timesUp() {
