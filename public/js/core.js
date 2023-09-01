@@ -814,6 +814,9 @@ class Game {
         // game cover
         this.gameCoverContainer = document.getElementById("gameCoverContainer");
 
+        // loading 
+        this.loadingContainer = document.getElementById("loadingContainer");
+
         // sprites
         this.spritesContainer = document.getElementById("spritesContainer");
 
@@ -1051,7 +1054,7 @@ class Game {
     }
 
     toggleLoadingDialog(visible) {
-        
+        this.loadingContainer.style.visibility = visible ? "visible" : "hidden";
     }
 
     toggleScrollingScenery(enabled) {

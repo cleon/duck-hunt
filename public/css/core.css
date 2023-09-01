@@ -23,6 +23,12 @@
     }
 }
 
+@keyframes ellipsis {
+    to {
+        width: 1.25em;
+    }
+}
+
 * {
     box-sizing: border-box;
 }
@@ -79,6 +85,36 @@ body {
     background-size: 400% 400%;
     animation: gradient 5s ease infinite;
     height: var(--app-height);
+}
+
+#loadingContainer {
+    width: 100vw;
+    height: var(--app-height);
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    visibility: hidden;
+    background-color: #000000;
+}
+
+#loadingMessage {
+    color: red;
+    border: 6px solid red;
+    border-radius: 18px;
+    font-size: 22pt;
+    padding: 12px;
+    width: 270px;
+    font-family: "Press Start 2P";
+}
+
+#loadingMessage:after {
+    overflow: hidden;
+    display: inline-block;
+    vertical-align: bottom;
+    animation: ellipsis steps(4, end) 1500ms infinite;
+    content: "\2026";
+    width: 0px;
 }
 
 #titleContainer {
