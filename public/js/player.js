@@ -26,6 +26,7 @@ class PlayerGame extends Game {
     this.shotsFired = 0;
     this.killCount = 0;
     this.hitCount = 0;
+    this.gameInProgress = false;
 
     this.timerRoundSpeedFactor = 1;
     this.spriteFlightSpeedFactor = 1;
@@ -75,6 +76,7 @@ class PlayerGame extends Game {
     this.dog.showRunning();
     this.playNewGameMusic(() => { // dont do ish until that jam ends. let the music play on play on play on...
       this.messages.showClickHere(() => {
+        this.gameInProgress = true;
         this.loopBGM();
         setTimeout(() => { this.dog.bark(); }, 1500);
         this.prepareNewGame();
@@ -148,19 +150,16 @@ class PlayerGame extends Game {
   }
 
   timesRunningOut() {
-    // stop BGM
     this.stopBGM();
-    // play time warning sound/song
     this.playHurryUp(() => {
-      // restart BGM at higher speed
       this.loopBGM(Sounds.HurryUpSpeed);
     });
   }
 
   timesUp() {
-    console.log('shots fired', this.shotsFired);
-    console.log('hit accuracy', Math.round((this.hitCount / this.shotsFired) * 1000) / 10);
-    console.log('kill efficiency', Math.round((this.killCount / this.shotsFired) * 1000) / 10);
+    //console.log('shots fired', this.shotsFired);
+    //console.log('hit accuracy', Math.round((this.hitCount / this.shotsFired) * 1000) / 10);
+    //console.log('kill efficiency', Math.round((this.killCount / this.shotsFired) * 1000) / 10);
 
     this.messages.show(Messages.FlyAway);
     this.stopClouds();
@@ -172,6 +171,8 @@ class PlayerGame extends Game {
 
     this.stopBGM();
     this.playFlyAwaySound();
+
+    this.gameInProgress = false;
 
     this.sprites.forEach(sprite => sprite.flyAway());
     this.playerChannel.publish("gameOver", {});
@@ -222,6 +223,14 @@ class PlayerGame extends Game {
       sprite.animate();
       sprite.flyAround(speedFactor);
     }
+  }
+
+  updateExistingSprites() {
+    const config = this.makeNewSpriteConfig();
+    this.sprites.forEach(sprite => {
+      sprite.setBackgroundImageUrl(config.imgUrl);
+      sprite.setSounds(config.sounds);
+    });
   }
 
   wireUpSpriteEvents(sprite) {
@@ -298,6 +307,14 @@ class PlayerGame extends Game {
         this.sight.shoot(e.pageX, e.pageY);
       }
     };
+  }
+
+  onGameThemeChanged() {
+    console.log('theme changed');
+    // update existing sprites look and sounds, not shots to kill
+    if (this.gameInProgress) {
+      this.updateExistingSprites();
+    }
   }
 
   async #generateGamerTag() {

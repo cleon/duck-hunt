@@ -309,6 +309,7 @@ class ShootableSprite extends Sprite {
         this.defaultMovementSpeed = 5;
         this.movementSpeed = this.defaultMovementSpeed;
         this.invincible = false;
+        this.panicking = false;
 
         // init to a random color
         this.color = this.colors[ShootableSprite.#rand(2)];
@@ -316,12 +317,14 @@ class ShootableSprite extends Sprite {
         // sounds
         this.sounds = sounds;
 
-        // ptr to the looped panic sound
+        // ptr to the looping panic sound
         this.panicSound = null;
     }
 
     setSounds(sounds) {
+        this.#stopPanicSound();
         this.sounds = sounds;
+        if (this.panicking) { this.#loopPanicSound(); }
     }
 
     animateSprite() {
@@ -425,7 +428,7 @@ class ShootableSprite extends Sprite {
         let sprite = this;
         sprite.stopFlying();
         sprite.stopAnimation();
-        sprite.stopPanicSound();
+        sprite.#stopPanicSound();
         sprite.sensitivityX = 0;
         sprite.sensitivityY = 0;
         sprite.el.style.pointerEvents = "none";
@@ -471,14 +474,23 @@ class ShootableSprite extends Sprite {
     }
 
     panic() {
+        this.panicking = true;
         this.movementSpeed *= 1.5;
+        this.#loopPanicSound();
+    }
+
+    stopPanicking() {
+        this.panicking = false;
+        this.movementSpeed = this.defaultMovementSpeed;
+        this.#stopPanicSound();
+    }
+
+    #loopPanicSound() {
         this.panicSound = this.sounds.panic.loop();
     }
 
-    stopPanicSound() {
-        if (this.panicSound) {
-            this.sounds.panic.stop(this.panicSound);
-        }
+    #stopPanicSound() {
+        this.sounds.panic.stop(this.panicSound);
     }
 
     shoot() {
@@ -490,7 +502,8 @@ class ShootableSprite extends Sprite {
                 this.el.style.pointerEvents = "none";
                 this.#raiseEvent("killed", { sprite: this });
 
-                this.stopPanicSound()
+                this.panicking = false;
+                this.#stopPanicSound();
                 this.sounds.killed.play();
 
                 this.stopFlying();
@@ -877,6 +890,7 @@ class Game {
         this.music = {
             bgm: null,
             bgmId: null,
+            bgmPlaybackRate: 1,
             bgmLoopPoint: 0,
             gameOver: null,
             newGame: null,
@@ -885,7 +899,7 @@ class Game {
     }
 
     makeShootableSprite() {
-        let config = this.#makeNewSpriteConfig();
+        let config = this.makeNewSpriteConfig();
         return new ShootableSprite(config.imgUrl, config.sounds, config.hitsToKill);
     }
 
@@ -902,18 +916,20 @@ class Game {
     }
 
     loopBGM(playbackRate = 1) {
+        this.music.bgmPlaybackRate = playbackRate;
         this.music.bgmId = this.music.bgm.loop(playbackRate, this.music.bgmLoopPoint);
     }
 
     stopBGM() {
         this.music.bgm.stop(this.music.bgmId);
+        this.music.bgmId = null;
     }
 
     playFlyAwaySound() {
         this.sounds.flyAway.play();
     }
 
-    #makeNewSpriteConfig() {
+    makeNewSpriteConfig() {
         let config = { hitsToKill: this.hitsToKill, sounds: {} };
         switch (this.gameTheme) {
             case "space":
@@ -940,11 +956,10 @@ class Game {
     }
 
     // let subclasses know the theme changed
-    onGameThemeChanged() { // update existing sprites
+    onGameThemeChanged() {
     }
 
-    #gameThemeChanged(newTheme) {
-        this.gameTheme = newTheme;
+    #updateGameThemeSettings() {
         switch (this.gameTheme) {
             case "space":
                 this.sounds.flyAway = Sounds.space_fly;
@@ -974,7 +989,17 @@ class Game {
                 this.dog.setBackgroundImageUrl("/img/dog.png");
                 break;
         }
+    }
 
+    #gameThemeChanged(newTheme) {
+        this.gameTheme = newTheme;
+        let playbackRate = null;
+        if (this.music.bgmId) { // we have a bgm loop groove goin here...
+            this.stopBGM();
+            playbackRate = this.music.bgmPlaybackRate;
+        }
+        this.#updateGameThemeSettings();
+        this.loopBGM(playbackRate);
         this.onGameThemeChanged();
     }
 
@@ -1084,7 +1109,7 @@ class Game {
         Features.lastSpriteGoesCrazy.onChange(current => this.lastSpriteGoesCrazy = current);
         Features.hitsToKill.onChange(current => this.hitsToKill = current);
 
-        this.#gameThemeChanged(this.gameTheme);
+        this.#updateGameThemeSettings();
         this.#soundEnabledChanged(this.soundEnabled);
     }
 
@@ -1137,4 +1162,4 @@ class Game {
     }
 }
 
-export { Game, Messages, Sounds as Sounds, Sight, Timebar };
+export { Game, Messages, Sounds, Sight, Timebar };
