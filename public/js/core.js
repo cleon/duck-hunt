@@ -1114,9 +1114,14 @@ class Game {
     }
 
     async initRT() {
-        this.RT = new Ably.Realtime.Promise({ authUrl: "/auth", transportParams: { remainPresentFor: 1000 } });
-        await this.RT.connection.once("connected");
-        this.gameChannel = this.RT.channels.get("launch-duckly");
+        try {
+            this.RT = new Ably.Realtime.Promise({ authUrl: "/auth", transportParams: { remainPresentFor: 1000 } });
+            await this.RT.connection.once("connected");
+            this.gameChannel = this.RT.channels.get("launch-duckly");
+        } catch (e) {
+            console.error("Unable to connect to real-time messaging", e);
+            throw e;
+        }
     }
 
     async loadImages() {
