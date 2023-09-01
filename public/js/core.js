@@ -49,12 +49,12 @@ class Messages {
 class Sounds {
     static #files = [
         // ducks
-        'barkX3', 'bgm', 'falling', 'fly', 'ground', 'quack', 'run', 'run2', 'shoot',
+        'barkX3', 'bgm', 'falling', 'fly', 'ground', 'quack', 'run', 'run2', 'shoot', 'hurryup',
         // space
-        'space_fly', 'space_bgm', 'space_newgame', 'space_gameover', 'space_falling', 'space_ground', 'space_hit', 'space_killed', 'space_panic'
+        'space_fly', 'space_bgm', 'space_newgame', 'space_gameover', 'space_falling', 'space_ground', 'space_hit', 'space_killed', 'space_panic', 'space_hurryup'
     ];
     static #context = new (window.AudioContext || window.webkitAudioContext)();
-    static HurryUpSpeed = 1.08;
+    static HurryUpSpeed = 1.12;
     static {
         this.#unlockAudioContext();
         const emptyBuffer = this.#context.createBuffer(1, 1, 22050);
@@ -876,7 +876,8 @@ class Game {
             bgmId: null,
             bgmLoopPoint: 0,
             gameOver: null,
-            newGame: null
+            newGame: null,
+            hurryUp: null
         };
     }
 
@@ -891,6 +892,10 @@ class Game {
 
     playGameOverBGM(callback) {
         this.music.gameOver.play(callback);
+    }
+
+    playHurryUp(callback) {
+        this.music.hurryUp.play(callback);
     }
 
     loopBGM(playbackRate = 1) {
@@ -943,7 +948,8 @@ class Game {
                 this.music.bgm = Sounds.space_bgm;
                 this.music.gameOver = Sounds.space_gameover;
                 this.music.newGame = Sounds.space_newgame;
-                this.music.bgmLoopPoint = 1.2; //loop at the 1.2 mark of the track
+                this.music.hurryUp = Sounds.space_hurryup;
+                this.music.bgmLoopPoint = 1.2; //loop at the 1.2 sec mark of the track so we only hear the drum riff when the game starts
 
                 this.mountains.style.backgroundImage = `url('/img/mountains.png')`;
                 this.scenery.style.backgroundImage = `url('/img/scenery.png')`;
@@ -956,6 +962,8 @@ class Game {
                 this.music.bgm = Sounds.bgm;
                 this.music.gameOver = Sounds.run2;
                 this.music.newGame = Sounds.run;
+                this.music.hurryUp = Sounds.hurryup;
+                this.music.bgmLoopPoint = 0;
 
                 this.mountains.style.backgroundImage = `url('/img/mountains.png')`;
                 this.scenery.style.backgroundImage = `url('/img/scenery.png')`;
@@ -1042,6 +1050,10 @@ class Game {
         this.scrollSceneryTimeout = setTimeout(() => { this.#scrollScenery(); }, this.scrollSceneryInterval);
     }
 
+    toggleLoadingDialog(visible) {
+        
+    }
+
     toggleScrollingScenery(enabled) {
         if (enabled && !this.sceneryIsScrolling) {
             this.#scrollScenery();
@@ -1110,7 +1122,11 @@ class Game {
 
     // external method to start the game after assets and components load/initialize
     run() {
-        this.loadAssets().then(() => this.main());
+        this.toggleLoadingDialog(true);
+        this.loadAssets().then(() => {
+            this.toggleLoadingDialog(false);
+            this.main();
+        });
     }
 
     main() {

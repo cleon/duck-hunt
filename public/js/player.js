@@ -23,6 +23,9 @@ class PlayerGame extends Game {
 
     this.score = 0;
     this.round = 0;
+    this.shotsFired = 0;
+    this.killCount = 0;
+    this.hitCount = 0;
 
     this.timerRoundSpeedFactor = 1;
     this.spriteFlightSpeedFactor = 1;
@@ -96,6 +99,10 @@ class PlayerGame extends Game {
   prepareNewGame() {
     //reset game state
     this.score = 0;
+    this.hitCount = 0;
+    this.killCount = 0;
+    this.shotsFired = 0;
+
     this.round = 0;
     this.landedSpriteCount = 0;
     this.timerRoundSpeedFactor = 1;
@@ -144,14 +151,19 @@ class PlayerGame extends Game {
     // stop BGM
     this.stopBGM();
     // play time warning sound/song
-    // restart BGM at higher speed
-    this.loopBGM(Sounds.HurryUpSpeed);
+    this.playHurryUp(() => {
+      // restart BGM at higher speed
+      this.loopBGM(Sounds.HurryUpSpeed);
+    });
   }
 
   timesUp() {
+    console.log('shots fired', this.shotsFired);
+    console.log('hit accuracy', Math.round((this.hitCount / this.shotsFired) * 1000) / 10);
+    console.log('kill efficiency', Math.round((this.killCount / this.shotsFired) * 1000) / 10);
+
     this.messages.show(Messages.FlyAway);
     this.stopClouds();
-    //this.dog.stopBarking();
     this.dog.hide();
     this.toggleShootingEnabled(false);
     this.sight.hide();
@@ -215,6 +227,7 @@ class PlayerGame extends Game {
   wireUpSpriteEvents(sprite) {
     sprite.onHit(s => {
       if (this.shootingEnabled) {
+        this.hitCount++;
         if (this.round > 1) {
           Timebar.add(this.timeRewardFactor);
         }
@@ -224,6 +237,7 @@ class PlayerGame extends Game {
     sprite.onKilled(s => {
       this.sprites.delete(s.id);
       this.score++;
+      this.killCount++;
       this.setPlayerScore(this.score);
 
       this.playerChannel.publish("kill", {});
@@ -266,6 +280,7 @@ class PlayerGame extends Game {
   initPlayerInteractions() {
     window.onmousedown = (e) => {
       if (this.shootingEnabled) {
+        this.shotsFired++;
         this.sight.move(e.clientX, e.clientY);
         this.sight.shoot(e.clientX, e.clientY);
       }
@@ -278,6 +293,7 @@ class PlayerGame extends Game {
     // HACK for iOS Safari
     window.ontouchstart = (e) => {
       if (this.shootingEnabled) {
+        this.shotsFired++;
         this.sight.move(e.pageX, e.pageY);
         this.sight.shoot(e.pageX, e.pageY);
       }
