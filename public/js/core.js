@@ -500,6 +500,7 @@ class ShootableSprite extends Sprite {
                 this.invincible = true;
                 this.el.classList.remove("blink");
                 this.el.style.pointerEvents = "none";
+                this.#raiseEvent("hit", { sprite: this });
                 this.#raiseEvent("killed", { sprite: this });
 
                 this.panicking = false;

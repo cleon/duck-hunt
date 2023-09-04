@@ -11,6 +11,10 @@ class PlayerGame extends Game {
     this.playerName = document.getElementById("playerName");
     this.playerScore = document.getElementById("playerScore");
     this.roundNumber = document.getElementById("roundNumber");
+    this.gameSummaryContainer = document.getElementById("gameSummaryContainer");
+    this.gameSummaryShotsFired = document.getElementById("gameSummaryShotsFired");
+    this.gameSummaryHits = document.getElementById("gameSummaryHits");
+    this.gameSummaryHitMissRatio = document.getElementById("gameSummaryHitMissRatio");
 
     this.shootingEnabled = false;
     this.sight = new Sight();
@@ -157,10 +161,6 @@ class PlayerGame extends Game {
   }
 
   timesUp() {
-    //console.log('shots fired', this.shotsFired);
-    //console.log('hit accuracy', Math.round((this.hitCount / this.shotsFired) * 1000) / 10);
-    //console.log('kill efficiency', Math.round((this.killCount / this.shotsFired) * 1000) / 10);
-
     this.messages.show(Messages.FlyAway);
     this.stopClouds();
     this.dog.hide();
@@ -184,10 +184,36 @@ class PlayerGame extends Game {
           this.messages.hide();
           Timebar.toggleVisible(false);
           this.togglePlayerInfo(false);
-          this.newGame();
-        }, 3000);
+          this.showGameSummary(() => {
+            this.hideGameSummary();
+            this.newGame();
+          });
+        }, 2000);
       });
     }, 3000);
+  }
+
+  hideGameSummary() {
+    this.gameSummaryContainer.style.visibility = "hidden";
+    this.gameSummaryContainer.style.pointerEvents = "none";
+  }
+
+  showGameSummary(callback) {
+    this.gameSummaryContainer.style.visibility = "visible";
+    this.gameSummaryContainer.style.pointerEvents = "auto";
+
+    const shots = this.shotsFired;
+    const hits = this.hitCount;
+    const ratio = shots > 0 ? ((hits / shots) * 100).toFixed(1) : 0;
+
+    this.gameSummaryShotsFired.innerText = shots;
+    this.gameSummaryHits.innerText = hits;
+    this.gameSummaryHitMissRatio.innerText = ratio + "%";
+
+    this.gameSummaryContainer.onclick = (e) => {
+      this.hideGameSummary();
+      callback();
+    };
   }
 
   setPlayerName(name) {
