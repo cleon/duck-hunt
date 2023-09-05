@@ -61,6 +61,10 @@ body {
     animation: blink 0.1s steps(5, start) infinite;
 }
 
+.white {
+    filter: brightness(0) invert(1);
+}
+
 #gameCoverContainer {
     width: 100vw;
     height: var(--app-height);

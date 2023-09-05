@@ -63,6 +63,7 @@ class Sounds {
             let ctx = this.#context;
 
             let sound = {};
+            sound.name = file;
             sound.vol = ctx.createGain();
             sound.vol.gain.value = 1;
             sound.vol.connect(ctx.destination);
@@ -101,7 +102,7 @@ class Sounds {
                 if (snd) { snd.stop(); }
             };
 
-            sound.mute = function (muted = true) {
+            sound.mute = function (muted = true) { // mutes all nodes connected to this gainNode
                 const value = (muted) ? 0 : 1;
                 sound.vol.gain.value = value;
             };
@@ -499,6 +500,7 @@ class ShootableSprite extends Sprite {
             if (this.hitCount == this.hitsToKill) { // killed
                 this.invincible = true;
                 this.el.classList.remove("blink");
+                this.el.classList.remove("white");
                 this.el.style.pointerEvents = "none";
                 this.#raiseEvent("hit", { sprite: this });
                 this.#raiseEvent("killed", { sprite: this });
@@ -519,6 +521,14 @@ class ShootableSprite extends Sprite {
             } else { // hit
                 this.#raiseEvent("hit", { sprite: this });
                 this.sounds.hit.play();
+
+                // hit color
+                this.el.classList.add("white");
+                setTimeout(() => {
+                    this.el.classList.remove("white");
+                }, 100);
+
+                // make it flash
                 this.el.classList.add("blink");
                 setTimeout(() => {
                     this.el.classList.remove("blink");
@@ -583,6 +593,7 @@ class Sight extends Sprite {
         this.animationTimeoutDelay = 50;
         this.backgroundPosition = 0;
         this.animate();
+        this.shootSound = Sounds.shoot;
     }
 
     animateSprite() {
@@ -598,8 +609,12 @@ class Sight extends Sprite {
         this.stopAnimation();
         this.move(x, y);
         this.el.style.backgroundPosition = "-66px 0px";
-        Sounds.shoot.play();
+        this.shootSound.play();
         this.animate();
+    }
+
+    toggleSFX(enabled) {
+        this.shootSound.mute(!enabled);
     }
 }
 
@@ -699,8 +714,8 @@ class Dog extends Sprite {
         this.barkSound.play();
     }
 
-    stopBarking() {
-        //this.barkSound.stop();
+    toggleSFX(enabled) {
+        this.barkSound.mute(!enabled);
     }
 }
 
@@ -789,6 +804,7 @@ class Features {
     static #flags = {                 // feature flags + fallback values
         "gameTheme": "ducks",         // the theme of the game
         "soundEnabled": true,         // all sounds on/off
+        "sounds": "on",               // on (all on), off (all off), bgmOnly (music only), sfxOnly (sounds only)
         "spritesToLaunch": 5,         // initial number of sprites per round
         "flockMultiplier": 1.5,       // number of sprites increased per round
         "speedMultiplier": 0.2,       // clock speed and sprite flight speed multiplier
@@ -895,7 +911,15 @@ class Game {
             bgmLoopPoint: 0,
             gameOver: null,
             newGame: null,
-            hurryUp: null
+            hurryUp: null,
+            toggleMute: function (muted) {
+                Object.keys(this).forEach(key => {
+                    const track = this[key];
+                    if (track && track.mute) {
+                        track.mute(muted);
+                    }
+                });
+            }
         };
     }
 
@@ -953,11 +977,26 @@ class Game {
                 config.sounds.panic = Sounds.quack;
                 break;
         }
+        const settings = this.#getSoundSettings();
+        this.toggleSFX(config.sounds, settings.sfxOn);
         return config;
+    }
+
+    toggleSFX(sounds, enabled) {
+        Object.keys(sounds).forEach(sound => {
+            const snd = sounds[sound];
+            if (snd && snd.mute) {
+                snd.mute(!enabled);
+            }
+        });
     }
 
     // let subclasses know the theme changed
     onGameThemeChanged() {
+    }
+
+    // let subclasses know sfx settings changed
+    onSFXEnabledChanged(enabled) {
     }
 
     #updateGameThemeSettings() {
@@ -968,7 +1007,7 @@ class Game {
                 this.music.gameOver = Sounds.space_gameover;
                 this.music.newGame = Sounds.space_newgame;
                 this.music.hurryUp = Sounds.space_hurryup;
-                this.music.bgmLoopPoint = 1.2; //loop at the 1.2 sec mark of the track so we only hear the drum riff when the game starts
+                this.music.bgmLoopPoint = 1.2; //loop at the 1.2 sec mark of the track so we only hear the intro drum riff once
 
                 this.mountains.style.backgroundImage = `url('/img/mountains.png')`;
                 this.scenery.style.backgroundImage = `url('/img/scenery.png')`;
@@ -1004,8 +1043,36 @@ class Game {
         this.onGameThemeChanged();
     }
 
-    #soundEnabledChanged(enabled) {
-        Sounds.muteAll(!enabled);
+    #soundSettingsChanged(newSettings) {
+        this.soundSettings = newSettings;
+        this.#updateSoundSettings();
+    }
+
+    #getSoundSettings() {
+        let musicOn = true, sfxOn = true;
+        switch (this.soundSettings) {
+            case "off":
+                musicOn = false;
+                sfxOn = false;
+                break;
+            case "bgmOnly":
+                sfxOn = false;
+                break;
+            case "sfxOnly":
+                musicOn = false;
+                break;
+            case "on":
+            default:
+                break;
+        }
+        return { musicOn: musicOn, sfxOn: sfxOn };
+    }
+
+    #updateSoundSettings() {
+        const config = this.#getSoundSettings();
+        this.music.toggleMute(!config.musicOn);
+        this.dog.toggleSFX(config.sfxOn);
+        this.onSFXEnabledChanged(config.sfxOn);
     }
 
     showGameCover(callback) {
@@ -1095,23 +1162,26 @@ class Game {
 
     async loadFlaggableFeatures() {
         this.gameTheme = await Features.gameTheme.value();
-        this.soundEnabled = await Features.soundEnabled.value();
+        //this.soundEnabled = await Features.soundEnabled.value();
         this.spritesToLaunch = await Features.spritesToLaunch.value();
         this.flockMultiplier = await Features.flockMultiplier.value();
         this.speedMultiplier = await Features.speedMultiplier.value();
         this.lastSpriteGoesCrazy = await Features.lastSpriteGoesCrazy.value();
         this.hitsToKill = await Features.hitsToKill.value();
+        this.soundSettings = await Features.sounds.value();
 
         Features.gameTheme.onChange(current => this.#gameThemeChanged(current));
-        Features.soundEnabled.onChange(current => this.#soundEnabledChanged(current));
+        //Features.soundEnabled.onChange(current => this.#soundSettingsChanged(current));
+        Features.sounds.onChange(current => this.#soundSettingsChanged(current));
         Features.spritesToLaunch.onChange(current => this.spritesToLaunch = current);
         Features.flockMultiplier.onChange(current => this.flockMultiplier = current);
         Features.speedMultiplier.onChange(current => this.speedMultiplier = current);
         Features.lastSpriteGoesCrazy.onChange(current => this.lastSpriteGoesCrazy = current);
         Features.hitsToKill.onChange(current => this.hitsToKill = current);
 
+        // set the initial state based on flag values
         this.#updateGameThemeSettings();
-        this.#soundEnabledChanged(this.soundEnabled);
+        this.#updateSoundSettings();
     }
 
     async initRT() {

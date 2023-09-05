@@ -15,6 +15,7 @@ class PlayerGame extends Game {
     this.gameSummaryShotsFired = document.getElementById("gameSummaryShotsFired");
     this.gameSummaryHits = document.getElementById("gameSummaryHits");
     this.gameSummaryHitMissRatio = document.getElementById("gameSummaryHitMissRatio");
+    this.gameSummaryScore = document.getElementById("gameSummaryScore");
 
     this.shootingEnabled = false;
     this.sight = new Sight();
@@ -55,8 +56,8 @@ class PlayerGame extends Game {
   }
 
   run() {
-    this.initPlayerInteractions();
     this.messages.toggleTitle(true);
+    this.initPlayerInteractions();
     this.#generateGamerTag().then(super.run());
   }
 
@@ -76,15 +77,15 @@ class PlayerGame extends Game {
     this.messages.toggleTitle(true);
     this.toggleScrollingScenery(true);
     this.hideClouds();
-    this.toggleTitleSprites(true);
     this.dog.showRunning();
+    this.toggleTitleSprites(true);
     this.playNewGameMusic(() => { // dont do ish until that jam ends. let the music play on play on play on...
       this.messages.showClickHere(() => {
         this.gameInProgress = true;
         this.loopBGM();
         setTimeout(() => { this.dog.bark(); }, 1500);
         this.prepareNewGame();
-        this.startRound();
+        this.startNewRound();
       });
     });
   }
@@ -128,13 +129,14 @@ class PlayerGame extends Game {
     this.prepareNewRound();
   }
 
-  startRound() {
+  startNewRound() {
     setTimeout(() => {
+      this.messages.hide();
+      this.dog.hide();
+      this.toggleScrollingScenery(false);
+
       this.toggleShootingEnabled(true);
       this.sight.show();
-      this.dog.hide();
-      this.messages.hide();
-      this.toggleScrollingScenery(false);
 
       this.spritesInCurrentRound = this.spritesToLaunch;
       this.adjustDifficulty();
@@ -161,20 +163,21 @@ class PlayerGame extends Game {
   }
 
   timesUp() {
-    this.messages.show(Messages.FlyAway);
-    this.stopClouds();
-    this.dog.hide();
+    this.gameInProgress = false;
+    Timebar.pause();
+    this.stopBGM();
+
     this.toggleShootingEnabled(false);
     this.sight.hide();
 
-    Timebar.pause();
+    this.dog.hide();
+    this.stopClouds();
 
-    this.stopBGM();
+    this.messages.show(Messages.FlyAway);
+
     this.playFlyAwaySound();
-
-    this.gameInProgress = false;
-
     this.sprites.forEach(sprite => sprite.flyAway());
+
     this.playerChannel.publish("gameOver", {});
 
     setTimeout(() => {
@@ -193,27 +196,18 @@ class PlayerGame extends Game {
     }, 3000);
   }
 
-  hideGameSummary() {
-    this.gameSummaryContainer.style.visibility = "hidden";
-    this.gameSummaryContainer.style.pointerEvents = "none";
-  }
+  launchSprites(numberOfSprites, speedFactor) {
+    this.playerChannel.publish("launchSprites", { count: numberOfSprites });
 
-  showGameSummary(callback) {
-    this.gameSummaryContainer.style.visibility = "visible";
-    this.gameSummaryContainer.style.pointerEvents = "auto";
-
-    const shots = this.shotsFired;
-    const hits = this.hitCount;
-    const ratio = shots > 0 ? ((hits / shots) * 100).toFixed(1) : 0;
-
-    this.gameSummaryShotsFired.innerText = shots;
-    this.gameSummaryHits.innerText = hits;
-    this.gameSummaryHitMissRatio.innerText = ratio + "%";
-
-    this.gameSummaryContainer.onclick = (e) => {
-      this.hideGameSummary();
-      callback();
-    };
+    for (let i = 0; i < numberOfSprites; i++) {
+      const sprite = this.makeShootableSprite();
+      this.spritesContainer.appendChild(sprite.el);
+      this.wireUpSpriteEvents(sprite);
+      this.sprites.set(sprite.id, sprite);
+      sprite.show();
+      sprite.animate();
+      sprite.flyAround(speedFactor);
+    }
   }
 
   setPlayerName(name) {
@@ -237,25 +231,42 @@ class PlayerGame extends Game {
     this.shootingEnabled = enabled;
   }
 
-  launchSprites(numberOfSprites, speedFactor) {
-    this.playerChannel.publish("launchSprites", { count: numberOfSprites });
-
-    for (let i = 0; i < numberOfSprites; i++) {
-      const sprite = this.makeShootableSprite();
-      this.spritesContainer.appendChild(sprite.el);
-      this.wireUpSpriteEvents(sprite);
-      this.sprites.set(sprite.id, sprite);
-      sprite.show();
-      sprite.animate();
-      sprite.flyAround(speedFactor);
-    }
+  hideGameSummary() {
+    this.gameSummaryContainer.style.visibility = "hidden";
+    this.gameSummaryContainer.style.pointerEvents = "none";
   }
 
-  updateExistingSprites() {
+  showGameSummary(callback) {
+    const gsc = this.gameSummaryContainer;
+    gsc.style.visibility = "visible";
+    gsc.style.pointerEvents = "auto";
+
+    const shots = this.shotsFired;
+    const hits = this.hitCount;
+    const ratio = shots > 0 ? ((hits / shots) * 100).toFixed(1) : 0;
+
+    this.gameSummaryScore.innerText = this.score;
+    this.gameSummaryShotsFired.innerText = shots;
+    this.gameSummaryHits.innerText = hits;
+    this.gameSummaryHitMissRatio.innerText = ratio + "%";
+
+    gsc.onclick = (e) => {
+      this.hideGameSummary();
+      callback();
+    };
+  }
+
+  updateExistingSpritesTheme() {
     const config = this.makeNewSpriteConfig();
     this.sprites.forEach(sprite => {
       sprite.setBackgroundImageUrl(config.imgUrl);
       sprite.setSounds(config.sounds);
+    });
+  }
+
+  toggleExistingSpritesMute(mute) {
+    this.sprites.forEach(sprite => {
+      this.toggleSFX(sprite.sounds, !mute);
     });
   }
 
@@ -302,7 +313,7 @@ class PlayerGame extends Game {
                 setTimeout(() => {
                   this.spritesToFetch = 0;
                   this.prepareNewRound();
-                  this.startRound();
+                  this.startNewRound();
                 }, 1200);
               }
             });
@@ -336,11 +347,14 @@ class PlayerGame extends Game {
   }
 
   onGameThemeChanged() {
-    console.log('theme changed');
-    // update existing sprites look and sounds, not shots to kill
     if (this.gameInProgress) {
-      this.updateExistingSprites();
+      this.updateExistingSpritesTheme();
     }
+  }
+
+  onSFXEnabledChanged(enabled) {
+    this.sight.toggleSFX(enabled);
+    this.toggleExistingSpritesMute(!enabled);
   }
 
   async #generateGamerTag() {
