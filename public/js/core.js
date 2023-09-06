@@ -662,15 +662,18 @@ class Dog extends Sprite {
     hide() {
         super.hide();
         this.stopAnimation();
+        this.isRunning = false;
+        this.isFetching = false;
     }
 
     fetchSpritesAtX(spriteCount, x, callback) {
+        this.isRunning = false
+
         if (spriteCount < 1) {
             if (callback) { callback(); }
             return;
         }
 
-        this.isRunning = false
         this.isFetching = true;
         this.hide();
 

@@ -16,6 +16,7 @@ class PlayerGame extends Game {
     this.gameSummaryHits = document.getElementById("gameSummaryHits");
     this.gameSummaryHitMissRatio = document.getElementById("gameSummaryHitMissRatio");
     this.gameSummaryScore = document.getElementById("gameSummaryScore");
+    this.gameSummaryPlayerName = document.getElementById("gameSummaryPlayerName");
 
     this.shootingEnabled = false;
     this.sight = new Sight();
@@ -245,6 +246,7 @@ class PlayerGame extends Game {
     const hits = this.hitCount;
     const ratio = shots > 0 ? ((hits / shots) * 100).toFixed(1) : 0;
 
+    this.gameSummaryPlayerName.innerText = this.player.nickname;
     this.gameSummaryScore.innerText = this.score;
     this.gameSummaryShotsFired.innerText = shots;
     this.gameSummaryHits.innerText = hits;
@@ -275,7 +277,7 @@ class PlayerGame extends Game {
       if (this.shootingEnabled) {
         this.hitCount++;
         if (this.round > 1) {
-          Timebar.add(this.timeRewardFactor);
+          //Timebar.add(this.timeRewardFactor);
         }
       }
     });
