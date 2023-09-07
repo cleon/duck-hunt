@@ -197,8 +197,8 @@ class Sprite {
     setHeightWidth(h = this.el.style.height, w = this.el.style.width) {
         this.height = h;
         this.width = w;
-        this.el.style.height = `${h}px`;
-        this.el.style.width = `${w}px`;
+        this.el.style.height = `${this.height}px`;
+        this.el.style.width = `${this.width}px`;
     }
 
     move(x = 0, y = 0) {
@@ -630,6 +630,8 @@ class Dog extends Sprite {
             Running: 0,
             Fetching: 225
         };
+        this.currentAnimationFrame = 0;
+        this.currentAnimationSequence = this.animationSequence.Running;
         this.animationTimeoutDelay = 70;
         this.isFetching = false;
         this.isRunning = false;
@@ -644,7 +646,9 @@ class Dog extends Sprite {
     }
 
     showRunning() {
+        this.isFetching = false;
         if (!this.isRunning) {
+            this.isRunning = true;
             this.hide();
             this.setHeightWidth(150, 90);
             this.el.style.bottom = "200px";
@@ -655,46 +659,49 @@ class Dog extends Sprite {
             this.currentAnimationSequence = this.animationSequence.Running;
             this.animate();
             this.show();
-            this.isRunning = true;
         }
+    }
+
+    stopAnimation() {
+        super.stopAnimation();
+        this.placeBackgroundImage(this.currentAnimationFrame, this.animationSequence.Running);
+        this.isRunning = false;
+        this.isFetching = false;
     }
 
     hide() {
         super.hide();
         this.stopAnimation();
-        this.isRunning = false;
-        this.isFetching = false;
     }
 
     fetchSpritesAtX(spriteCount, x, callback) {
-        this.isRunning = false
+        this.isRunning = false;
 
         if (spriteCount < 1) {
             if (callback) { callback(); }
             return;
         }
 
-        this.isFetching = true;
         this.hide();
+        this.isFetching = true;
 
-        let y = this.animationSequence.Fetching;
         if (spriteCount < 2) {
             this.setHeightWidth(this.height, 145);
-            this.placeBackgroundImage(0, y);
+            this.placeBackgroundImage(0, this.animationSequence.Fetching);
         } else {
             this.setHeightWidth(this.height, 170);
-            this.placeBackgroundImage(-192, y);
+            this.placeBackgroundImage(-192, this.animationSequence.Fetching);
         }
 
-        y = window.innerHeight + this.height - Dog.#distanceUpFromBottom;
+        let y = window.innerHeight + this.height - Dog.#distanceUpFromBottom;
 
         this.move(x, y);
         this.show();
 
         let frameCount = 0;
         let increment = 5;
-        const dog = this;
 
+        const dog = this;
         (function animateFetch() {
             setTimeout(() => {
                 increment = (frameCount++ < 30) ? 5 : -5;

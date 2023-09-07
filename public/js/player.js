@@ -11,6 +11,7 @@ class PlayerGame extends Game {
     this.playerName = document.getElementById("playerName");
     this.playerScore = document.getElementById("playerScore");
     this.roundNumber = document.getElementById("roundNumber");
+
     this.gameSummaryContainer = document.getElementById("gameSummaryContainer");
     this.gameSummaryShotsFired = document.getElementById("gameSummaryShotsFired");
     this.gameSummaryHits = document.getElementById("gameSummaryHits");
